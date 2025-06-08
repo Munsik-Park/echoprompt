@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlmodel import Session, select
 import openai
 import os
@@ -19,7 +19,7 @@ load_dotenv()
 # OpenAI API 키 설정
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-router = APIRouter(prefix="/query", tags=["query"])
+router = APIRouter(prefix="/query", tags=["Query"])
 qdrant_client = QdrantClient()
 
 async def get_embedding(text: str) -> List[float]:
@@ -31,9 +31,16 @@ async def get_embedding(text: str) -> List[float]:
     return response["data"][0]["embedding"]
 
 
-@router.post("/semantic_search", response_model=SemanticSearchResponse)
+@router.post(
+    "/semantic_search",
+    response_model=SemanticSearchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Semantic search",
+    description="Search messages semantically within a session.",
+)
 def semantic_search(
-    request: SemanticSearchRequest, db: Session = Depends(get_session)
+    request: SemanticSearchRequest,
+    db: Session = Depends(get_session),
 ):
     """Perform semantic search within a session."""
     result = db.exec(select(SessionModel).where(SessionModel.id == request.session_id))

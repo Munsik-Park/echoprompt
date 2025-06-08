@@ -1,23 +1,41 @@
 from sqlmodel import SQLModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 class SessionBase(SQLModel):
-    name: str
+    """Common fields for a chat session."""
+
+    name: str = Field(
+        ...,
+        description="Name of the session",
+        example="My first session",
+    )
 
 class SessionCreate(SessionBase):
     pass
 
 class SessionUpdate(SQLModel):
-    """Session update model."""
-    name: Optional[str] = None
+    """Schema for updating an existing session."""
+
+    name: Optional[str] = Field(
+        None,
+        description="Updated session name",
+        example="Updated session",
+    )
 
 class SessionResponse(SessionBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    """Response model for session information."""
+
+    id: int = Field(..., description="Session ID", example=1)
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(
+        None,
+        description="Last modification timestamp",
+    )
 
 class SessionModel(SessionBase, table=True):
+    """Database model for storing sessions."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow) 
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
