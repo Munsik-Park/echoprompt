@@ -94,6 +94,29 @@ class QdrantClient:
         )
         return search_result
 
+    def delete_embedding(self, message_id: int) -> None:
+        """Delete embedding for a specific message."""
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.PointIdsList(points=[message_id]),
+        )
+
+    def delete_session_embeddings(self, session_id: int) -> None:
+        """Delete all embeddings for a session."""
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="session_id",
+                            match=models.MatchValue(value=session_id),
+                        )
+                    ]
+                )
+            ),
+        )
+
 # QdrantClient 인스턴스 생성 및 export
 qdrant_client = QdrantClient()
 

@@ -6,5 +6,11 @@ class SemanticSearchRequest(BaseModel):
     query: str
     limit: int = 5
 
+class SemanticSearchResult(BaseModel):
+    """Single search result with similarity score."""
+    content: str
+    score: float
+
 class SemanticSearchResponse(BaseModel):
-    messages: List[str] 
+    """Semantic search response."""
+    results: List[SemanticSearchResult]
