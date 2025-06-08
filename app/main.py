@@ -5,8 +5,8 @@ from app.database import create_db_and_tables
 
 app = FastAPI(
     title="EchoPrompt API",
-    description="API for managing chat sessions and semantic search",
-    version="1.0.0"
+    description="Manage chat sessions and perform semantic search with a vector database",
+    version="1.0.0",
 )
 
 # CORS middleware configuration
@@ -27,7 +27,12 @@ async def on_startup():
     """서버 시작 시 DB 테이블 생성"""
     create_db_and_tables()
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["Root"],
+    summary="API root",
+    description="Health check endpoint",
+)
 async def root():
-    """API 루트 엔드포인트"""
-    return {"message": "Welcome to EchoPrompt API"} 
+    """Root endpoint returning a welcome message."""
+    return {"message": "Welcome to EchoPrompt API"}
