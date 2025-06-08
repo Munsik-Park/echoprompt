@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import session_router, query_router
+from app.routers import chat_router
 from app.database import create_db_and_tables
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app.add_middleware(
 # Include routers (prefix는 각 라우터 파일에서 지정)
 app.include_router(session_router.router)
 app.include_router(query_router.router)
+app.include_router(chat_router.router)
 
 @app.on_event("startup")
 async def on_startup():

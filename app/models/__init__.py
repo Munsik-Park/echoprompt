@@ -5,6 +5,7 @@ from .query import (
     SemanticSearchResult,
     SemanticSearchResponse,
 )
+from .chat import ChatRequest, ChatResponse
 
 __all__ = [
     'SessionModel',
@@ -17,5 +18,7 @@ __all__ = [
     'MessageResponse',
     'SemanticSearchRequest',
     'SemanticSearchResult',
-    'SemanticSearchResponse'
+    'SemanticSearchResponse',
+    'ChatRequest',
+    'ChatResponse'
 ]
