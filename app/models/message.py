@@ -9,6 +9,11 @@ class MessageBase(SQLModel):
 class MessageCreate(MessageBase):
     pass
 
+class MessageUpdate(SQLModel):
+    """Message update model."""
+    content: Optional[str] = None
+    role: Optional[str] = None
+
 class MessageResponse(MessageBase):
     id: int
     session_id: int
