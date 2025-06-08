@@ -1,6 +1,8 @@
 from .session import SessionModel, SessionCreate, SessionUpdate, SessionResponse
 from .message import MessageModel, MessageCreate, MessageUpdate, MessageResponse
 from .query import (
+    QueryRequest,
+    QueryResponse,
     SemanticSearchRequest,
     SemanticSearchResult,
     SemanticSearchResponse,
@@ -16,6 +18,8 @@ __all__ = [
     'MessageCreate',
     'MessageUpdate',
     'MessageResponse',
+    'QueryRequest',
+    'QueryResponse',
     'SemanticSearchRequest',
     'SemanticSearchResult',
     'SemanticSearchResponse',

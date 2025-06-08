@@ -199,3 +199,8 @@ echoprompt.db
 # Node.js
 node_modules/
 frontend/node_modules/
+
+# Test related
+frontend/playwright-report/
+frontend/test-results/
+*.bak

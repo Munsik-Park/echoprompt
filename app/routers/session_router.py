@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, Path, status
 from sqlmodel import Session, select
-from app.database import get_session
+from app.database import get_session, get_db
 from app.models import (
     SessionModel,
     SessionCreate,
@@ -17,7 +17,7 @@ from app.qdrant_client import qdrant_client
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 @router.post(
-    "/",
+    "",
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new session",
@@ -51,7 +51,7 @@ def get_session_endpoint(
     return session_obj
 
 @router.post(
-    "/{session_id}/messages/",
+    "/{session_id}/messages",
     response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Add message",
@@ -73,14 +73,23 @@ def create_message_endpoint(
     db.commit()
     db.refresh(new_message)
     
+    # 전달받은 메시지 내용 로그 출력
+    print(f"[DEBUG] message.content: {message.content}")
+    
     # 임베딩 생성 및 저장
     embedding = qdrant_client.get_embedding(message.content)
-    qdrant_client.store_embedding(new_message.id, session_id, message.content, embedding)
+    qdrant_client._ensure_collection(session_id)
+    qdrant_client.store_embedding(
+        message_id=new_message.id,
+        session_id=session_id,
+        content=message.content,
+        embedding=embedding
+    )
 
     return new_message
 
 @router.get(
-    "/{session_id}/messages/",
+    "/{session_id}/messages",
     response_model=List[MessageResponse],
     summary="List session messages",
     description="Retrieve all messages within a session.",
@@ -97,7 +106,6 @@ def get_messages_endpoint(
     # 메시지 조회
     messages = db.query(MessageModel).filter(MessageModel.session_id == session_id).all()
     return messages
-
 
 @router.delete(
     "/{session_id}",
@@ -123,7 +131,6 @@ def delete_session(
     db.delete(session_obj)
     db.commit()
 
-
 @router.put(
     "/{session_id}",
     response_model=SessionResponse,
@@ -145,7 +152,6 @@ def update_session(
     db.commit()
     db.refresh(session_obj)
     return session_obj
-
 
 @router.delete(
     "/{session_id}/messages/{message_id}",
@@ -170,7 +176,6 @@ def delete_message(
     qdrant_client.delete_embedding(message.id)
     db.delete(message)
     db.commit()
-
 
 @router.put(
     "/{session_id}/messages/{message_id}",
@@ -203,6 +208,23 @@ def update_message(
 
     qdrant_client.delete_embedding(message_obj.id)
     embedding = qdrant_client.get_embedding(message_obj.content)
-    qdrant_client.store_embedding(message_obj.id, session_id, message_obj.content, embedding)
+    qdrant_client._ensure_collection(session_id)
+    qdrant_client.store_embedding(
+        message_id=message_obj.id,
+        session_id=session_id,
+        content=message_obj.content,
+        embedding=embedding
+    )
 
     return message_obj
+
+@router.get(
+    "",
+    response_model=List[SessionResponse],
+    summary="List all sessions",
+    description="Retrieve all sessions.",
+)
+async def get_sessions(db: Session = Depends(get_db)):
+    """Return all sessions."""
+    sessions = db.query(SessionModel).all()
+    return sessions

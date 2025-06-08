@@ -1,4 +1,7 @@
 #!/bin/bash
+set -e
+
+API_URL="http://localhost:8000"
 
 # 서버 상태 확인 함수
 check_server() {
@@ -48,42 +51,36 @@ else
 fi
 
 echo "=== 1. 세션 생성 ==="
-SESSION_RESPONSE=$(curl -s -X POST "http://127.0.0.1:8000/sessions/" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "테스트 세션"}')
-echo "응답: $SESSION_RESPONSE"
-
-# 세션 ID 추출
-SESSION_ID=$(echo $SESSION_RESPONSE | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
-if [ -z "$SESSION_ID" ]; then
-    echo "세션 생성 실패"
-    exit 1
+SESSION_ID=$(curl -s -X POST $API_URL/sessions/ -H "Content-Type: application/json" -d '{"name": "테스트 세션"}' | jq .id)
+echo "[TEST] Created session: $SESSION_ID"
+if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "null" ]; then
+  echo "[ERROR] 세션 생성 실패"
+  exit 1
 fi
-echo "생성된 세션 ID: $SESSION_ID"
 
 echo -e "\n=== 2. 세션에 메시지 추가 ==="
-MESSAGE_RESPONSE=$(curl -s -X POST "http://127.0.0.1:8000/sessions/$SESSION_ID/messages/" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "안녕하세요!", "role": "user"}')
-echo "응답: $MESSAGE_RESPONSE"
-
-# 메시지 ID 추출
-MESSAGE_ID=$(echo $MESSAGE_RESPONSE | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
-if [ -z "$MESSAGE_ID" ]; then
-    echo "메시지 추가 실패"
-    exit 1
+MESSAGE_RES=$(curl -s -X POST $API_URL/sessions/$SESSION_ID/messages/ \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{"content": "테스트 메시지", "role": "user"}')
+echo "[TEST] Message add response: $MESSAGE_RES"
+MESSAGE_ID=$(echo $MESSAGE_RES | jq .id)
+if [ -z "$MESSAGE_ID" ] || [ "$MESSAGE_ID" = "null" ]; then
+  echo "[ERROR] 메시지 추가 실패"
+  exit 1
 fi
-echo "생성된 메시지 ID: $MESSAGE_ID"
 
 echo -e "\n=== 3. 세션 메시지 조회 ==="
 MESSAGES_RESPONSE=$(curl -s -X GET "http://127.0.0.1:8000/sessions/$SESSION_ID/messages/")
 echo "응답: $MESSAGES_RESPONSE"
 
 echo -e "\n=== 4. 의미 기반 검색 ==="
-SEARCH_RESPONSE=$(curl -s -X POST "http://127.0.0.1:8000/query/semantic_search" \
-  -H "Content-Type: application/json" \
-  -d "{\"query\": \"안녕?\", \"session_id\": $SESSION_ID, \"limit\": 3}")
-echo "응답: $SEARCH_RESPONSE"
+SEARCH_RES=$(curl -s -X POST $API_URL/query/semantic_search -H "Content-Type: application/json" -d "{\"query\": \"테스트\", \"session_id\": $SESSION_ID, \"limit\": 5}")
+echo "[TEST] Semantic search response: $SEARCH_RES"
+SEARCH_COUNT=$(echo $SEARCH_RES | jq '.results | length')
+if [ "$SEARCH_COUNT" -eq 0 ]; then
+  echo "[ERROR] 의미 기반 검색 실패"
+  exit 1
+fi
 
 echo -e "\n=== 5. 세션 정보 업데이트 ==="
 UPDATE_SESSION_RESPONSE=$(curl -s -X PUT "http://127.0.0.1:8000/sessions/$SESSION_ID" \
@@ -106,4 +103,6 @@ DELETE_SESSION_RESPONSE=$(curl -s -X DELETE "http://127.0.0.1:8000/sessions/$SES
 echo "응답 상태 코드: $?"
 
 # OpenAPI Spec 정리
-rm -f openapi.json 
+rm -f openapi.json
+
+echo "[SUCCESS] 모든 API 테스트가 정상적으로 완료되었습니다." 

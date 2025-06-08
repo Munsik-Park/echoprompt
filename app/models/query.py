@@ -1,5 +1,17 @@
-from typing import List
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
+
+class QueryRequest(BaseModel):
+    query: str
+    session_id: int
+    limit: int = 5
+
+class QueryResponse(BaseModel):
+    results: List[Dict[str, Any]]
+    total: int
+    status: str
+    message: str
+    metadata: Dict[str, Any]
 
 class SemanticSearchRequest(BaseModel):
     """Request body for semantic search."""
@@ -11,11 +23,25 @@ class SemanticSearchRequest(BaseModel):
 class SemanticSearchResult(BaseModel):
     """Single search result with similarity score."""
 
-    content: str = Field(..., description="Retrieved message content")
+    id: str = Field(..., description="Message ID")
     score: float = Field(..., description="Similarity score")
+    payload: Dict[str, str] = Field(..., description="Message payload containing content and role")
 
 class SemanticSearchResponse(BaseModel):
     """Semantic search response."""
 
     results: List[SemanticSearchResult] = Field(..., description="Search results")
+    total: int = Field(..., description="Total number of results")
+    status: str = Field("success", description="Response status")
+    message: str = Field("", description="Response message")
+    metadata: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "session_id": None,
+            "query": "",
+            "limit": 5,
+            "min_score": None,
+            "max_score": None
+        },
+        description="Search metadata"
+    )
 

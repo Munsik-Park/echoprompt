@@ -17,6 +17,11 @@ def get_session() -> Generator[Session, None, None]:
     with Session(engine, expire_on_commit=False) as session:
         yield session
 
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI 의존성 주입을 위한 데이터베이스 세션 생성 함수"""
+    with Session(engine, expire_on_commit=False) as session:
+        yield session
+
 def create_db_and_tables():
     """데이터베이스 테이블을 생성합니다."""
     SQLModel.metadata.create_all(engine) 
