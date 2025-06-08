@@ -111,11 +111,15 @@ bash test_api.sh
 ### Sessions
 - `POST /sessions/` - Create a new session
 - `GET /sessions/{session_id}` - Get session details
+- `PUT /sessions/{session_id}` - Update session information
+- `DELETE /sessions/{session_id}` - Delete a session and related data
 - `POST /sessions/{session_id}/messages/` - Add a message to a session
 - `GET /sessions/{session_id}/messages/` - Get all messages in a session
+- `PUT /sessions/{session_id}/messages/{message_id}` - Update a message
+- `DELETE /sessions/{session_id}/messages/{message_id}` - Delete a message
 
 ### Query
-- `POST /query/` - Search for similar messages using semantic search
+- `POST /query/semantic_search` - Search messages semantically within a session
 
 ## Development
 

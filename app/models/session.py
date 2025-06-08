@@ -8,6 +8,10 @@ class SessionBase(SQLModel):
 class SessionCreate(SessionBase):
     pass
 
+class SessionUpdate(SQLModel):
+    """Session update model."""
+    name: Optional[str] = None
+
 class SessionResponse(SessionBase):
     id: int
     created_at: datetime
