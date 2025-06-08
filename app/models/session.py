@@ -8,7 +8,7 @@ class SessionBase(SQLModel):
     name: str = Field(
         ...,
         description="Name of the session",
-        example="My first session",
+        sa_column_kwargs={"comment": "My first session"},
     )
 
 class SessionCreate(SessionBase):
@@ -20,13 +20,13 @@ class SessionUpdate(SQLModel):
     name: Optional[str] = Field(
         None,
         description="Updated session name",
-        example="Updated session",
+        sa_column_kwargs={"comment": "Updated session"},
     )
 
 class SessionResponse(SessionBase):
     """Response model for session information."""
 
-    id: int = Field(..., description="Session ID", example=1)
+    id: int = Field(..., description="Session ID", sa_column_kwargs={"comment": "1"})
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: Optional[datetime] = Field(
         None,

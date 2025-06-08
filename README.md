@@ -56,6 +56,24 @@ brew install qdrant
 qdrant
 ```
 
+---
+
+## ✅ Codex의 주요 역할
+- FastAPI 엔드포인트 문서화 (`summary`, `description`, `tags`, `response_model` 명시)
+- Pydantic 모델에 필드 설명 추가
+- Swagger (`/docs`) 자동화 문서 확인 (구조만)
+- OpenAPI 스펙 정합성 확보 (요청/응답 모델 구성)
+
+## 🚫 Codex가 할 필요 없는 작업 (참고만)
+- `test_api.sh` 스크립트 **작성/수정**은 가능하지만, **직접 실행은 불필요**
+- Qdrant 서버 구동 (Docker 실행)은 필요 없음
+- 로컬 DB 초기화, 마이그레이션 수행 필요 없음
+- 테스트 자동화 파이프라인 실행 필요 없음
+
+> **테스트 및 서버 운영 환경은 로컬에서 별도로 관리됩니다.**
+
+---
+
 ## How to Run (실행 방법)
 
 ### 1. FastAPI 서버 실행 (venv 환경에서)

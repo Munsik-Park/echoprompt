@@ -8,12 +8,12 @@ class MessageBase(SQLModel):
     content: str = Field(
         ...,
         description="Message content",
-        example="Hello, how are you?",
+        sa_column_kwargs={"comment": "Hello, how are you?"},
     )
     role: str = Field(
         ...,
         description="Message sender role ('user' or 'assistant')",
-        example="user",
+        sa_column_kwargs={"comment": "user"},
     )
 
 class MessageCreate(MessageBase):
@@ -25,19 +25,19 @@ class MessageUpdate(SQLModel):
     content: Optional[str] = Field(
         None,
         description="Updated message content",
-        example="Hi there!",
+        sa_column_kwargs={"comment": "Hi there!"},
     )
     role: Optional[str] = Field(
         None,
         description="Updated sender role",
-        example="assistant",
+        sa_column_kwargs={"comment": "assistant"},
     )
 
 class MessageResponse(MessageBase):
     """Response model for a chat message."""
 
-    id: int = Field(..., description="Message ID", example=1)
-    session_id: int = Field(..., description="Associated session ID", example=1)
+    id: int = Field(..., description="Message ID", sa_column_kwargs={"comment": "1"})
+    session_id: int = Field(..., description="Associated session ID", sa_column_kwargs={"comment": "1"})
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: Optional[datetime] = Field(
         None,
