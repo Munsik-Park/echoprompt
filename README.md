@@ -89,6 +89,13 @@ bash run_app.sh
 ```bash
 bash test_api.sh
 ```
+
+### Frontend Development
+```bash
+cd frontend
+npm install
+npm run dev
+```
 - 세션 생성, 메시지 추가, 메시지 조회, 의미 기반 검색을 curl로 테스트합니다.
 - 필요에 따라 test_api.sh의 세션 id 값을 수정하세요.
 
