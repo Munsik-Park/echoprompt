@@ -1,10 +1,6 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends, status
-from sqlmodel import Session, select
-from pydantic import BaseModel
-import openai
-import os
-from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 from app.models import (
     SessionModel,
     SemanticSearchRequest,
@@ -12,44 +8,16 @@ from app.models import (
     SemanticSearchResponse,
     MessageModel,
 )
-from app.database import get_session, get_db
-from app.qdrant_client import QdrantClient, qdrant_client
-from app.openai_client import client
+from app.models.error import ErrorResponse, ErrorCode
+from app.database import get_db
+from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
+from app.openai_client import get_openai_client
+from app.models.query import QueryRequest, QueryResponse
 
-# .env 파일 로드
-load_dotenv()
-
-# OpenAI API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.organization = os.getenv("OPENAI_ORGANIZATION_ID")
-
-router = APIRouter(prefix="/query", tags=["Query"])
-qdrant_client = QdrantClient()
-
-# OpenAI 클라이언트 초기화
-client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    organization=os.getenv("OPENAI_ORGANIZATION_ID")
+router = APIRouter(
+    prefix="/api/v1/query",
+    tags=["Query"]
 )
-
-async def get_embedding(text: str) -> List[float]:
-    """텍스트의 임베딩을 생성합니다."""
-    try:
-        response = client.embeddings.create(
-            input=text,
-            model="text-embedding-ada-002"
-        )
-        return response.data[0].embedding
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Embedding generation failed",
-                "message": str(e),
-                "code": "EMBEDDING_ERROR"
-            }
-        )
-
 
 @router.post(
     "/semantic_search",
@@ -58,23 +26,41 @@ async def get_embedding(text: str) -> List[float]:
     summary="Semantic search",
     description="Search messages semantically within a session.",
 )
-async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(get_db)):
+async def semantic_search(
+    request: SemanticSearchRequest,
+    db: Session = Depends(get_db),
+    qdrant_client: QdrantClientWrapper = Depends(get_qdrant_client),
+    openai_client = Depends(get_openai_client)
+):
     """세션 내에서 의미 기반 검색을 수행합니다."""
     try:
         # 세션 존재 여부 확인
         session = db.query(SessionModel).filter(SessionModel.id == request.session_id).first()
         if not session:
             raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "Session not found",
-                    "message": f"Session with ID {request.session_id} does not exist",
-                    "code": "SESSION_NOT_FOUND"
-                }
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ErrorResponse(
+                    error=ErrorCode.SESSION_NOT_FOUND,
+                    message=f"Session with ID {request.session_id} not found"
+                ).dict()
             )
 
         # 쿼리 임베딩 생성
-        query_embedding = await get_embedding(request.query)
+        try:
+            response = openai_client.embeddings.create(
+                input=request.query,
+                model="text-embedding-ada-002"
+            )
+            query_embedding = response.data[0].embedding
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ErrorResponse(
+                    error=ErrorCode.EMBEDDING_ERROR,
+                    message="Failed to generate embedding for query",
+                    details={"error": str(e)}
+                ).dict()
+            )
 
         # Qdrant에서 검색
         try:
@@ -85,12 +71,12 @@ async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(
             )
         except Exception as e:
             raise HTTPException(
-                status_code=500,
-                detail={
-                    "error": "Qdrant search failed",
-                    "message": str(e),
-                    "code": "QDRANT_SEARCH_ERROR"
-                }
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ErrorResponse(
+                    error=ErrorCode.QDRANT_ERROR,
+                    message="Failed to perform semantic search",
+                    details={"error": str(e)}
+                ).dict()
             )
 
         # 검색 결과가 없는 경우
@@ -144,10 +130,77 @@ async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Internal server error",
-                "message": str(e),
-                "code": "INTERNAL_SERVER_ERROR"
-            }
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error=ErrorCode.INTERNAL_SERVER_ERROR,
+                message="An unexpected error occurred",
+                details={"error": str(e)}
+            ).dict()
         )
+
+@router.post("/query", response_model=QueryResponse)
+def query(
+    request: QueryRequest,
+    db: Session = Depends(get_db),
+    qdrant_client: QdrantClientWrapper = Depends(get_qdrant_client)
+):
+    """세션 내에서 유사한 메시지를 검색합니다."""
+    try:
+        # 세션 존재 확인
+        session = db.query(SessionModel).filter(SessionModel.id == request.session_id).first()
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ErrorResponse(
+                    error=ErrorCode.SESSION_NOT_FOUND,
+                    message=f"Session with ID {request.session_id} not found"
+                ).dict()
+            )
+        
+        # 유사한 메시지 검색
+        try:
+            similar_messages = qdrant_client.search_similar(
+                query=request.query,
+                session_id=request.session_id,
+                limit=request.limit
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ErrorResponse(
+                    error=ErrorCode.QDRANT_ERROR,
+                    message="Failed to perform semantic search",
+                    details={"error": str(e)}
+                ).dict()
+            )
+        
+        return QueryResponse(
+            messages=[msg["content"] for msg in similar_messages],
+            scores=[msg["score"] for msg in similar_messages]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error=ErrorCode.INTERNAL_SERVER_ERROR,
+                message="An unexpected error occurred",
+                details={"error": str(e)}
+            ).dict()
+        )
+
+@router.get("/search")
+async def semantic_search(
+    query: str,
+    session_id: int,
+    limit: int = 5,
+    qdrant_client: QdrantClientWrapper = Depends(get_qdrant_client)
+):
+    """Perform semantic search on messages in a session."""
+    results = qdrant_client.search(
+        query=query,
+        session_id=session_id,
+        limit=limit
+    )
+    return results

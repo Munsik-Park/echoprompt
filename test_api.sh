@@ -1,7 +1,19 @@
 #!/bin/bash
 set -e
 
-API_URL="http://localhost:8000"
+if [ -z "$VITE_API_URL" ]; then
+    echo "Error: VITE_API_URL environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$VITE_API_VERSION" ]; then
+    echo "Error: VITE_API_VERSION environment variable is not set"
+    exit 1
+fi
+
+# API URL 구성
+BASE_URL="$VITE_API_URL"
+API_URL="$VITE_API_URL/api/$VITE_API_VERSION"
 
 # 서버 상태 확인 함수
 check_server() {
@@ -11,7 +23,7 @@ check_server() {
 
     echo "서버 상태 확인 중..."
     while [ $attempt -le $max_attempts ]; do
-        if curl -s -f "http://127.0.0.1:8000/docs" > /dev/null; then
+        if curl -s -f "$BASE_URL/docs" > /dev/null; then
             echo "✅ 서버가 정상적으로 실행 중입니다."
             return 0
         fi
@@ -32,7 +44,7 @@ fi
 
 echo "=== 0. Swagger 문서 검증 ==="
 echo "1. Swagger UI 접근 확인"
-if curl -s -f "http://127.0.0.1:8000/docs" > /dev/null; then
+if curl -s -f "$BASE_URL/docs" > /dev/null; then
     echo "✅ Swagger UI 접근 성공"
 else
     echo "❌ Swagger UI 접근 실패"
@@ -40,7 +52,7 @@ else
 fi
 
 echo -e "\n2. OpenAPI Spec 다운로드"
-if curl -s -f -o openapi.json "http://127.0.0.1:8000/openapi.json"; then
+if curl -s -f -o openapi.json "$BASE_URL/openapi.json"; then
     echo "✅ OpenAPI Spec 다운로드 성공"
     # OpenAPI Spec에서 엔드포인트 목록 추출
     echo -e "\n3. API 엔드포인트 목록:"
@@ -51,7 +63,7 @@ else
 fi
 
 echo "=== 1. 세션 생성 ==="
-SESSION_ID=$(curl -s -X POST $API_URL/sessions/ -H "Content-Type: application/json" -d '{"name": "테스트 세션"}' | jq .id)
+SESSION_ID=$(curl -s -X POST "$API_URL/sessions" -H "Content-Type: application/json" -d '{"name": "테스트 세션"}' | jq .id)
 echo "[TEST] Created session: $SESSION_ID"
 if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "null" ]; then
   echo "[ERROR] 세션 생성 실패"
@@ -59,7 +71,7 @@ if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "null" ]; then
 fi
 
 echo -e "\n=== 2. 세션에 메시지 추가 ==="
-MESSAGE_RES=$(curl -s -X POST $API_URL/sessions/$SESSION_ID/messages/ \
+MESSAGE_RES=$(curl -s -X POST "$API_URL/sessions/$SESSION_ID/messages" \
   -H "Content-Type: application/json; charset=utf-8" \
   -d '{"content": "테스트 메시지", "role": "user"}')
 echo "[TEST] Message add response: $MESSAGE_RES"
@@ -70,11 +82,11 @@ if [ -z "$MESSAGE_ID" ] || [ "$MESSAGE_ID" = "null" ]; then
 fi
 
 echo -e "\n=== 3. 세션 메시지 조회 ==="
-MESSAGES_RESPONSE=$(curl -s -X GET "http://127.0.0.1:8000/sessions/$SESSION_ID/messages/")
+MESSAGES_RESPONSE=$(curl -s -X GET "$API_URL/sessions/$SESSION_ID/messages")
 echo "응답: $MESSAGES_RESPONSE"
 
 echo -e "\n=== 4. 의미 기반 검색 ==="
-SEARCH_RES=$(curl -s -X POST $API_URL/query/semantic_search -H "Content-Type: application/json" -d "{\"query\": \"테스트\", \"session_id\": $SESSION_ID, \"limit\": 5}")
+SEARCH_RES=$(curl -s -X POST "$API_URL/query/semantic_search" -H "Content-Type: application/json" -d "{\"query\": \"테스트\", \"session_id\": $SESSION_ID, \"limit\": 5}")
 echo "[TEST] Semantic search response: $SEARCH_RES"
 SEARCH_COUNT=$(echo $SEARCH_RES | jq '.results | length')
 if [ "$SEARCH_COUNT" -eq 0 ]; then
@@ -83,23 +95,23 @@ if [ "$SEARCH_COUNT" -eq 0 ]; then
 fi
 
 echo -e "\n=== 5. 세션 정보 업데이트 ==="
-UPDATE_SESSION_RESPONSE=$(curl -s -X PUT "http://127.0.0.1:8000/sessions/$SESSION_ID" \
+UPDATE_SESSION_RESPONSE=$(curl -s -X PUT "$API_URL/sessions/$SESSION_ID" \
   -H "Content-Type: application/json" \
   -d '{"name": "업데이트된 테스트 세션"}')
 echo "응답: $UPDATE_SESSION_RESPONSE"
 
 echo -e "\n=== 6. 메시지 업데이트 ==="
-UPDATE_MESSAGE_RESPONSE=$(curl -s -X PUT "http://127.0.0.1:8000/sessions/$SESSION_ID/messages/$MESSAGE_ID" \
+UPDATE_MESSAGE_RESPONSE=$(curl -s -X PUT "$API_URL/sessions/$SESSION_ID/messages/$MESSAGE_ID" \
   -H "Content-Type: application/json" \
   -d '{"content": "업데이트된 메시지입니다!", "role": "user"}')
 echo "응답: $UPDATE_MESSAGE_RESPONSE"
 
 echo -e "\n=== 7. 메시지 삭제 ==="
-DELETE_MESSAGE_RESPONSE=$(curl -s -X DELETE "http://127.0.0.1:8000/sessions/$SESSION_ID/messages/$MESSAGE_ID")
+DELETE_MESSAGE_RESPONSE=$(curl -s -X DELETE "$API_URL/sessions/$SESSION_ID/messages/$MESSAGE_ID")
 echo "응답 상태 코드: $?"
 
 echo -e "\n=== 8. 세션 삭제 ==="
-DELETE_SESSION_RESPONSE=$(curl -s -X DELETE "http://127.0.0.1:8000/sessions/$SESSION_ID")
+DELETE_SESSION_RESPONSE=$(curl -s -X DELETE "$API_URL/sessions/$SESSION_ID")
 echo "응답 상태 코드: $?"
 
 # OpenAPI Spec 정리

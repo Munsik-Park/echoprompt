@@ -1,0 +1,30 @@
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
+
+class ErrorResponse(BaseModel):
+    error: str
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+class ErrorCode:
+    # 세션 관련 에러
+    SESSION_NOT_FOUND = "SESSION_NOT_FOUND"
+    SESSION_CREATE_FAILED = "SESSION_CREATE_FAILED"
+    SESSION_UPDATE_FAILED = "SESSION_UPDATE_FAILED"
+    SESSION_DELETE_FAILED = "SESSION_DELETE_FAILED"
+    
+    # 메시지 관련 에러
+    MESSAGE_NOT_FOUND = "MESSAGE_NOT_FOUND"
+    MESSAGE_CREATE_FAILED = "MESSAGE_CREATE_FAILED"
+    MESSAGE_UPDATE_FAILED = "MESSAGE_UPDATE_FAILED"
+    MESSAGE_DELETE_FAILED = "MESSAGE_DELETE_FAILED"
+    
+    # 검색 관련 에러
+    SEARCH_FAILED = "SEARCH_FAILED"
+    EMBEDDING_ERROR = "EMBEDDING_ERROR"
+    QDRANT_ERROR = "QDRANT_ERROR"
+    
+    # 시스템 에러
+    INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    DATABASE_ERROR = "DATABASE_ERROR" 
