@@ -45,3 +45,4 @@ class SemanticSearchResponse(BaseModel):
         description="Search metadata"
     )
 
+ 

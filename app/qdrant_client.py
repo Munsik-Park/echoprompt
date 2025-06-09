@@ -7,6 +7,7 @@ import requests
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
 import openai
+from app.openai_client import OpenAIClientFactory
 
 # .env 파일 로드
 load_dotenv()
@@ -32,17 +33,10 @@ OPENAI_API_KEY = env_vars["OPENAI_API_KEY"]
 OPENAI_ORG_ID = env_vars["OPENAI_ORGANIZATION_ID"]
 COLLECTION_NAME = "echoprompt_messages"
 
-# OpenAI API 설정
-OPENAI_API_URL = "https://api.openai.com/v1/embeddings"
-OPENAI_MODEL = "text-embedding-ada-002"
-
 class QdrantClientWrapper:
-    def __init__(self):
-        self.client = QdrantClient(url=QDRANT_URL)
-        self.openai_client = openai.OpenAI(
-            api_key=OPENAI_API_KEY,
-            organization=OPENAI_ORG_ID
-        )
+    def __init__(self, url: Optional[str] = None, openai_client: Optional[openai.OpenAI] = None):
+        self.client = QdrantClient(url=url or QDRANT_URL)
+        self.openai_client = openai_client or OpenAIClientFactory.create_client()
         self.collection_name = "messages"
         self._ensure_collection()
 
@@ -80,10 +74,7 @@ class QdrantClientWrapper:
             text = text.encode('utf-8').decode('utf-8')
             
             # OpenAI 클라이언트 사용
-            client = openai.OpenAI(api_key=OPENAI_API_KEY, organization=OPENAI_ORG_ID)
-            
-            # API 호출
-            response = client.embeddings.create(
+            response = self.openai_client.embeddings.create(
                 input=text,
                 model="text-embedding-ada-002"
             )
@@ -195,112 +186,16 @@ class QdrantClientWrapper:
             print(f"Error deleting session embeddings: {str(e)}")
             raise
 
-# QdrantClient 인스턴스 생성 및 export
-qdrant_client = QdrantClientWrapper()
+class QdrantClientFactory:
+    @staticmethod
+    def create_client(
+        url: Optional[str] = None,
+        openai_client: Optional[openai.OpenAI] = None
+    ) -> QdrantClientWrapper:
+        """Qdrant 클라이언트를 생성합니다."""
+        return QdrantClientWrapper(url=url, openai_client=openai_client)
 
-class QdrantWrapper:
-    def __init__(self):
-        """Qdrant 클라이언트 초기화"""
-        self.client = QdrantClient(url=QDRANT_URL)
-        self._ensure_collection()
-
-    def _ensure_collection(self, session_id: Optional[int] = None):
-        if session_id is None:
-            # 서버 부팅 시 기본 초기화 로직만
-            return
-        collection_name = f"session_{session_id}"
-        collections = self.client.get_collections().collections
-        if not any(c.name == collection_name for c in collections):
-            self.client.create_collection(
-                collection_name=collection_name,
-                vectors_config=models.VectorParams(
-                    size=1536,  # OpenAI ada-002 embedding size
-                    distance=models.Distance.COSINE
-                )
-            )
-
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def get_embedding(self, text: str) -> List[float]:
-        """텍스트의 임베딩 벡터 생성 (재시도 로직 포함)"""
-        try:
-            # OpenAI 클라이언트 사용
-            client = openai.OpenAI(
-                api_key=OPENAI_API_KEY,
-                organization=OPENAI_ORG_ID
-            )
-            
-            # API 호출
-            response = client.embeddings.create(
-                model=OPENAI_MODEL,
-                input=text
-            )
-            
-            # 응답에서 임베딩 추출
-            return response.data[0].embedding
-
-        except Exception as e:
-            print(f"임베딩 생성 중 오류 발생: {str(e)}")
-            raise
-
-    async def store_message_embedding(
-        self,
-        message_id: str,
-        session_id: int,
-        content: str
-    ) -> None:
-        """메시지 임베딩을 생성하고 Qdrant에 저장"""
-        try:
-            # 텍스트 임베딩 생성
-            embedding = await self.get_embedding(content)
-            
-            # Qdrant에 저장
-            self._ensure_collection(session_id)
-            self.client.upsert(
-                collection_name=f"session_{session_id}",
-                points=[
-                    models.PointStruct(
-                        id=message_id,
-                        vector=embedding,
-                        payload={
-                            "session_id": session_id,
-                            "content": content
-                        }
-                    )
-                ]
-            )
-        except Exception as e:
-            print(f"임베딩 저장 중 오류 발생: {str(e)}")
-            raise
-
-    async def search_similar_messages(
-        self,
-        query: str,
-        session_id: int,
-        top_k: int = 5
-    ) -> List[Tuple[str, float]]:
-        """유사한 메시지 검색"""
-        try:
-            # 쿼리 임베딩 생성
-            query_embedding = await self.get_embedding(query)
-            
-            # Qdrant에서 검색
-            search_result = self.client.search(
-                collection_name=f"session_{session_id}",
-                query_vector=query_embedding,
-                query_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="session_id",
-                            match=models.MatchValue(value=session_id)
-                        )
-                    ]
-                ),
-                limit=top_k
-            )
-            return [(hit.id, hit.score) for hit in search_result]
-        except Exception as e:
-            print(f"메시지 검색 중 오류 발생: {str(e)}")
-            raise
-
-# Qdrant 클라이언트 인스턴스 생성
-qdrant = QdrantWrapper() 
+# FastAPI 의존성으로 제공
+def get_qdrant_client() -> QdrantClientWrapper:
+    """FastAPI 의존성 주입을 위한 Qdrant 클라이언트 생성 함수"""
+    return QdrantClientFactory.create_client() 

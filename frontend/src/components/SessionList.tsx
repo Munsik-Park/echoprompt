@@ -9,8 +9,19 @@ interface Session {
   updated_at: string;
 }
 
-export default function SessionList() {
+interface SessionListProps {
+  onSessionSelect: (id: number) => void;
+  selectedSessionId: number | null;
+}
+
+export default function SessionList({ onSessionSelect, selectedSessionId }: SessionListProps) {
   const { sessions, loading, error, refetch } = useSessions();
+
+  useEffect(() => {
+    // 세션 목록이 변경될 때마다 로그 출력
+    console.log('Sessions updated:', sessions);
+    console.log('Selected session:', selectedSessionId);
+  }, [sessions, selectedSessionId]);
 
   if (loading) {
     return (
@@ -56,7 +67,15 @@ export default function SessionList() {
           <div
             key={session.id}
             data-testid={`session-${session.id}`}
-            className="p-4 border rounded hover:bg-gray-50 cursor-pointer"
+            onClick={() => {
+              console.log('Session clicked:', session.id);
+              onSessionSelect(session.id);
+            }}
+            className={`p-4 border rounded cursor-pointer transition-colors duration-200 ${
+              session.id === selectedSessionId
+                ? 'bg-blue-50 border-blue-500'
+                : 'hover:bg-gray-50'
+            }`}
           >
             <h3 className="font-medium">{session.name}</h3>
             <p className="text-sm text-gray-500">

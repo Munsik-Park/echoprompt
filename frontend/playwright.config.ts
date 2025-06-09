@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+if (!process.env.VITE_FRONTEND_URL) {
+  throw new Error('VITE_FRONTEND_URL environment variable is not set');
+}
+
+const FRONTEND_URL = process.env.VITE_FRONTEND_URL;
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -8,7 +14,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: FRONTEND_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -37,7 +43,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: FRONTEND_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000, // 2분
   },

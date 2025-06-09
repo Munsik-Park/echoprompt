@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -7,9 +9,10 @@ export interface ChatMessage {
 
 interface ChatWindowProps {
   messages: ChatMessage[];
+  isLoading?: boolean;
 }
 
-function ChatWindow({ messages }: ChatWindowProps) {
+function ChatWindow({ messages, isLoading = false }: ChatWindowProps) {
   // 메시지를 타임스탬프로 정렬
   const sortedMessages = [...messages].sort((a, b) => 
     (a.timestamp || 0) - (b.timestamp || 0)
@@ -38,6 +41,19 @@ function ChatWindow({ messages }: ChatWindowProps) {
             0% { background-color: yellow; }
             100% { background-color: transparent; }
           }
+          .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
         `}
       </style>
       {sortedMessages.map((msg, idx) => (
@@ -54,6 +70,14 @@ function ChatWindow({ messages }: ChatWindowProps) {
           {msg.content}
         </div>
       ))}
+      {isLoading && (
+        <div 
+          className="flex justify-center items-center p-4"
+          data-testid="loading-spinner"
+        >
+          <div className="loading-spinner" />
+        </div>
+      )}
     </div>
   );
 }

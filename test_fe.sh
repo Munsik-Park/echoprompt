@@ -1,5 +1,18 @@
 #!/bin/bash
 
+if [ -z "$VITE_API_URL" ]; then
+    echo "Error: VITE_API_URL environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$VITE_FRONTEND_URL" ]; then
+    echo "Error: VITE_FRONTEND_URL environment variable is not set"
+    exit 1
+fi
+
+BACKEND_URL="$VITE_API_URL"
+FRONTEND_URL="$VITE_FRONTEND_URL"
+
 # 색상 정의
 GREEN='\033[0;32m'
 RED='\033[0;31m'

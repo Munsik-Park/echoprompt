@@ -4,6 +4,7 @@ import ChatWindow, { ChatMessage } from './components/ChatWindow';
 import PromptInput from './components/PromptInput';
 import SemanticSearch from './components/SemanticSearch';
 import api from './api/api';
+import { API_PATHS } from './api/constants';
 import { useState } from 'react';
 
 function App() {
@@ -21,7 +22,7 @@ function App() {
     
     try {
       // 세션의 메시지 목록 가져오기
-      const response = await api.get<ChatMessage[]>(`/sessions/${sessionId}/messages`);
+      const response = await api.get<ChatMessage[]>(API_PATHS.MESSAGES(sessionId));
       setMessages(response.data);
     } catch (err) {
       console.error('Error loading session messages:', err);
@@ -49,9 +50,9 @@ function App() {
       setMessages(prev => [...prev, userMessage]);
 
       // API 호출
-      const res = await api.post<{ message: string }>('/chat', {
-        session_id: selectedSessionId,
-        prompt,
+      const res = await api.post<{ message: string }>(API_PATHS.CHAT, {
+        prompt: prompt,
+        session_id: selectedSessionId
       });
 
       if (!res.data || !res.data.message) {
@@ -92,7 +93,7 @@ function App() {
       <div className="flex flex-1">
         <SessionList onSessionSelect={handleSessionSelect} selectedSessionId={selectedSessionId} />
         <div className="flex-1 flex flex-col">
-          <ChatWindow messages={messages} />
+          <ChatWindow messages={messages} isLoading={loading} />
           {error && (
             <div className="p-2 bg-red-100 text-red-700 text-sm" data-testid="error-message">
               {error}

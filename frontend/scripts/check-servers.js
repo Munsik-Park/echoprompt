@@ -1,7 +1,17 @@
 import axios from 'axios';
 
-const BACKEND_URL = 'http://localhost:8000';
-const FRONTEND_URL = 'http://localhost:3000';
+if (!process.env.VITE_API_URL) {
+  console.error('Error: VITE_API_URL environment variable is not set');
+  process.exit(1);
+}
+
+if (!process.env.VITE_FRONTEND_URL) {
+  console.error('Error: VITE_FRONTEND_URL environment variable is not set');
+  process.exit(1);
+}
+
+const BACKEND_URL = process.env.VITE_API_URL;
+const FRONTEND_URL = process.env.VITE_FRONTEND_URL;
 
 async function checkServer(url, name) {
   try {

@@ -51,3 +51,4 @@ class MessageModel(MessageBase, table=True):
     session_id: int = Field(foreign_key="sessionmodel.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
+ 

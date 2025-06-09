@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api/api';
+import { API_PATHS } from '../api/constants';
 
 interface SearchResult {
   id: string;
@@ -43,7 +44,7 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
     
     try {
       console.log('Searching with query:', query);
-      const response = await api.post<SearchResponse>('/query/semantic_search', {
+      const response = await api.post<SearchResponse>(API_PATHS.QUERY, {
         query: query.trim(),
         session_id: sessionId,
         limit: 5
@@ -67,31 +68,30 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="p-4">
+    <div className="fixed bottom-0 right-0 w-96 bg-white shadow-lg border-t border-l p-4">
+      <h3 className="text-lg font-semibold mb-4">의미 검색</h3>
       <div className="flex gap-2 mb-4">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Semantic search..."
-          className="flex-1 p-2 border rounded"
+          placeholder="검색어를 입력하세요..."
+          className="flex-1 px-3 py-2 border rounded"
           data-testid="search-input"
         />
         <button
           onClick={handleSearch}
           disabled={loading}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
           data-testid="search-button"
         >
-          검색
+          {loading ? '검색 중...' : '검색'}
         </button>
       </div>
 
       {error && (
-        <div className="p-4 mb-4 text-red-500 bg-red-50 rounded" data-testid="search-error">
-          {error}
-        </div>
+        <div className="text-red-500 text-sm mb-4">{error}</div>
       )}
 
       {metadata && (
@@ -111,31 +111,16 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
       )}
 
       {!loading && results.length > 0 && (
-        <div className="search-results space-y-4" data-testid="search-results">
-          {results.map((result) => (
-            <div
-              key={result.id}
-              className="search-result p-4 bg-white rounded shadow cursor-pointer hover:bg-gray-50"
-              data-testid={`search-result-${result.id}`}
-              onClick={() => {
-                const messageElement = document.querySelector(`[data-message-id="${result.id}"]`);
-                if (messageElement) {
-                  messageElement.classList.add('highlighted-message');
-                  messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-              }}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-gray-500">
-                  {result.payload.role === 'user' ? '사용자' : '어시스턴트'}
-                </span>
-                <span className="text-sm text-gray-400">
-                  유사도: {result.score.toFixed(3)}
-                </span>
-              </div>
-              <p className="text-gray-800">{result.payload.content}</p>
-            </div>
-          ))}
+        <div className="mt-4" data-testid="search-results">
+          <h3 className="text-lg font-semibold mb-2">검색 결과</h3>
+          <ul className="space-y-2">
+            {results.map((result, index) => (
+              <li key={index} className="p-3 bg-gray-50 rounded">
+                <p className="text-sm text-gray-600">{result.payload.content}</p>
+                <p className="text-xs text-gray-400 mt-1">유사도: {(result.score * 100).toFixed(2)}%</p>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

@@ -196,11 +196,16 @@ cython_debug/
 # Project specific
 nohup.out
 echoprompt.db
+
 # Node.js
 node_modules/
-frontend/node_modules/
 
-# Test related
-frontend/playwright-report/
-frontend/test-results/
-*.bak
+# Local development files
+package.json
+package-lock.json
+.DS_Store
+*.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
