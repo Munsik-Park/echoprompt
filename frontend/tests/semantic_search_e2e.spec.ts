@@ -63,10 +63,10 @@ test.describe('Semantic search after sending message', () => {
     // Reload to verify session persistence
     await page.reload();
     await page.waitForTimeout(1000);
-    const sessionItems = page.locator('[data-testid^="session-"]');
+    const sessionItems = page.locator('[data-testid="session-item"]');
     const sessionCount = await sessionItems.count();
     if (sessionCount === 0) {
-      throw new Error('세션 생성 실패로 이후 테스트를 진행할 수 없습니다.');
+      throw new Error('세션 생성 실패로 테스트를 중단합니다.');
     }
 
     await selectSession(page, session.id);
@@ -93,7 +93,10 @@ test.describe('Semantic search after sending message', () => {
 
     const testCases = Array.from({ length: 3 }).map(() => {
       const [cityA, cityB] = getRandomPair(cities);
-      return { city: cityB, message: `${cityA}에서 ${cityB}까지의 거리는 몇 km야?` };
+      return {
+        city: cityB,
+        message: `${cityA}에서 ${cityB}까지 거리는 얼마나 되나요?`,
+      };
     });
 
     for (const { city, message } of testCases) {
@@ -102,18 +105,22 @@ test.describe('Semantic search after sending message', () => {
       await input.press('Enter');
 
       // 임베딩/저장 대기
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(4000);
 
       const searchInput = page.locator('[data-testid="search-input"]');
       await searchInput.fill(city);
       await searchInput.press('Enter');
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(1500);
       const results = await page
         .locator('[data-testid="search-result-item"]')
         .allTextContents();
       console.log('검색 결과:', results);
-      expect(results.length).toBeGreaterThan(0);
+      if (results.length === 0) {
+        throw new Error(
+          `검색 결과 없음 - 입력 메시지: "${message}" / 검색어: "${city}"`
+        );
+      }
       expect(results.some((r) => r.includes(message))).toBe(true);
     }
   });
