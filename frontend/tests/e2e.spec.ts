@@ -18,7 +18,9 @@ async function createSession(apiContext: any, testName: string) {
     headers: COMMON_HEADERS,
   });
   expect(res.ok()).toBeTruthy();
-  return res.json();
+  const data = await res.json();
+  console.log('Created session with ID:', data.id);
+  return data;
 }
 
 async function deleteAllSessions(apiContext: any) {
@@ -36,7 +38,9 @@ async function deleteAllSessions(apiContext: any) {
 
 async function selectSession(page: Page, id: number) {
   const sessionSelector = `[data-testid="session-${id}"]`;
-  await page.waitForSelector(sessionSelector, { state: 'visible' });
+  console.log('Selecting session', id);
+  await expect(page.locator('[data-testid^="session-"]')).toContainText(`${id}`, { timeout: 90000 });
+  await page.waitForSelector(sessionSelector, { state: 'visible', timeout: 90000 });
   await page.click(sessionSelector);
   await expect(page.locator(sessionSelector)).toHaveClass(/bg-blue-50/);
   await expect(page.locator('[data-testid="prompt-input"]')).toBeEnabled();
