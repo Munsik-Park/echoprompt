@@ -13,13 +13,14 @@ const COMMON_HEADERS = {
 
 async function createSession(apiContext: any, testName: string) {
   const name = `테스트 세션 - ${testName} - ${Date.now()}`;
+  console.log('세션 생성 요청 시작');
   const res = await apiContext.post(`${API_BASE_URL}/api/${API_VERSION}${API_PATHS.SESSIONS}`, {
     data: { name },
     headers: COMMON_HEADERS,
   });
   expect(res.ok()).toBeTruthy();
   const data = await res.json();
-  console.log('Created session with ID:', data.id);
+  console.log('세션 생성 완료. ID:', data.id);
   return data;
 }
 
@@ -38,11 +39,15 @@ async function deleteAllSessions(apiContext: any) {
 
 async function selectSession(page: Page, id: number) {
   const sessionSelector = `[data-testid="session-${id}"]`;
-  console.log('Selecting session', id);
-  await expect(page.locator('[data-testid^="session-"]')).toContainText(`${id}`, { timeout: 90000 });
-  await page.waitForSelector(sessionSelector, { state: 'visible', timeout: 90000 });
-  await page.click(sessionSelector);
-  await expect(page.locator(sessionSelector)).toHaveClass(/bg-blue-50/);
+  const sessionList = page.locator('[data-testid="session-list"]');
+  const targetSession = sessionList.locator(sessionSelector);
+
+  console.log('Waiting for session to appear in session list:', sessionSelector);
+  await expect(targetSession).toBeVisible({ timeout: 90000 });
+
+  await targetSession.click();
+  console.log('session-' + id + ' 선택 완료');
+  await expect(targetSession).toHaveClass(/bg-blue-50/);
   await expect(page.locator('[data-testid="prompt-input"]')).toBeEnabled();
 }
 
@@ -69,8 +74,10 @@ test.describe('EchoPrompt E2E', () => {
     const message = '서울에서 뉴욕까지 몇 km인가요?';
 
     await input.fill(message);
+    console.log('사용자 메시지 입력 및 전송');
     await input.press('Enter');
 
+    console.log('하이라이팅 감지 시작');
     await waitForHighlight(page, message);
     const assistant = page.locator('[data-testid^="message-assistant-"]').first();
     await expect(assistant).toBeVisible();
@@ -81,6 +88,7 @@ test.describe('EchoPrompt E2E', () => {
     const msg = '하이라이트 테스트 메시지';
 
     await input.fill(msg);
+    console.log('사용자 메시지 입력 및 전송');
     await input.press('Enter');
     await expect(page.locator('[data-testid="message-assistant-0"]')).toBeVisible();
     await expect(page.locator('[data-testid="save-indicator"]')).toHaveText('저장 완료');
@@ -89,6 +97,7 @@ test.describe('EchoPrompt E2E', () => {
     await searchInput.fill('하이라이트');
     await page.locator('[data-testid="search-button"]').click();
     await expect(page.locator('[data-testid^="search-result-"]')).toHaveCount(1);
+    console.log('하이라이팅 감지 시작');
     await waitForHighlight(page, '하이라이트');
   });
 });
