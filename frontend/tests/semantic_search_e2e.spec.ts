@@ -60,6 +60,8 @@ test.describe('Semantic search after sending message', () => {
     await page.goto(FRONTEND_URL);
     const session = await createSession(apiContext, testInfo.title);
 
+    // Allow the new session to propagate before reloading
+    await page.waitForTimeout(1500);
     // Reload to verify session persistence
     await page.reload();
     await page.waitForTimeout(1000);
@@ -105,7 +107,7 @@ test.describe('Semantic search after sending message', () => {
       await input.press('Enter');
 
       // 임베딩/저장 대기
-      await page.waitForTimeout(4000);
+      await page.waitForTimeout(4500);
 
       const searchInput = page.locator('[data-testid="search-input"]');
       await searchInput.fill(city);
