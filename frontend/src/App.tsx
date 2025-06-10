@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import SessionList from './components/SessionList';
 import ChatWindow, { ChatMessage } from './components/ChatWindow';
@@ -5,114 +6,195 @@ import PromptInput from './components/PromptInput';
 import SemanticSearch from './components/SemanticSearch';
 import api from './api/api';
 import { API_PATHS } from './api/constants';
-import { useState } from 'react';
+import axios from 'axios';
 
 function App() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastMessageTimestamp, setLastMessageTimestamp] = useState<number>(0);
 
-  const handleSessionSelect = async (sessionId: number) => {
-    setSelectedSessionId(sessionId);
-    setMessages([]); // 세션 변경 시 메시지 초기화
-    setError(null);
-    setSaveStatus('idle');
-    
+  // 세션 변경 시 메시지 목록 초기화 및 가져오기
+  useEffect(() => {
+    if (selectedSessionId) {
+      fetchMessages(selectedSessionId);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedSessionId]);
+
+  const fetchMessages = async (sessionId: number) => {
     try {
-      // 세션의 메시지 목록 가져오기
-      const response = await api.get<ChatMessage[]>(API_PATHS.MESSAGES(sessionId));
-      setMessages(response.data);
-    } catch (err) {
-      console.error('Error loading session messages:', err);
-      setError('세션 메시지를 불러오는 중 오류가 발생했습니다.');
+      const response = await api.get(API_PATHS.SESSION_MESSAGES(sessionId));
+      if (response.data && Array.isArray(response.data)) {
+        const formattedMessages = response.data.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          id: msg.id,
+          timestamp: new Date(msg.created_at).getTime()
+        }));
+        setMessages(formattedMessages);
+        
+        // 마지막 메시지 타임스탬프 업데이트
+        if (formattedMessages.length > 0) {
+          const lastTimestamp = Math.max(...formattedMessages.map(msg => msg.timestamp));
+          setLastMessageTimestamp(lastTimestamp);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
     }
   };
 
-  const sendPrompt = async (prompt: string) => {
-    if (!selectedSessionId) {
-      setError('세션을 선택해주세요.');
-      return;
-    }
+  const handleSendMessage = async (content: string) => {
+    if (!selectedSessionId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-      setSaveStatus('saving');
-
-      // 사용자 메시지 추가
-      const userMessage: ChatMessage = {
-        role: 'user',
-        content: prompt,
+      setIsLoading(true);
+      
+      // 1. 사용자 메시지 먼저 추가
+      const userMessage = {
+        id: Date.now(), // 임시 ID
+        content: content,
+        role: 'user' as const,
         timestamp: Date.now()
       };
-      setMessages(prev => [...prev, userMessage]);
+      setMessages(prevMessages => [...prevMessages, userMessage]);
 
-      // API 호출
-      const res = await api.post<{ message: string }>(API_PATHS.CHAT, {
-        prompt: prompt,
-        session_id: selectedSessionId
+      // 2. LLM 응답 요청
+      const response = await api.post(`/sessions/${selectedSessionId}/messages`, {
+        content,
+        role: 'user'
       });
 
-      if (!res.data || !res.data.message) {
-        throw new Error('Invalid response from server');
+      // 3. LLM 응답이 있는지 확인
+      if (!response.data || (!response.data.message?.content && !response.data.content)) {
+        throw new Error('LLM 응답이 없습니다.');
       }
 
-      // 어시스턴트 메시지 추가
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: res.data.message,
-        timestamp: Date.now()
+      // 4. LLM 응답 메시지 생성
+      const assistantMessage = {
+        id: response.data.message?.id || response.data.id,
+        content: response.data.message?.content || response.data.content,
+        role: 'assistant' as const,
+        timestamp: response.data.message?.created_at || response.data.created_at || Date.now()
       };
-      setMessages(prev => [...prev, assistantMessage]);
 
-      // Qdrant 저장 완료 표시
-      setSaveStatus('saved');
+      // 5. 사용자 메시지 ID 업데이트 및 어시스턴트 메시지 추가
+      setMessages(prevMessages => {
+        const updatedMessages = prevMessages.map(msg => 
+          msg.id === userMessage.id 
+            ? { ...msg, id: response.data.message?.id || response.data.id }
+            : msg
+        );
+        return [...updatedMessages, assistantMessage];
+      });
 
-    } catch (err) {
-      console.error('Error sending message:', err);
+    } catch (error) {
+      console.error('메시지 전송 실패:', error);
       setError('메시지 전송 중 오류가 발생했습니다.');
-      setSaveStatus('idle');
       
-      // 에러 메시지 추가
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content: '죄송합니다. 메시지를 처리하는 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // 6. 오류 발생 시 사용자 메시지 제거
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => msg.id !== userMessage.id)
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateSession = async (prompt: string) => {
+    try {
+      const response = await api.post(API_PATHS.SESSIONS, {
+        name: prompt
+      });
+      
+      if (response.data && response.data.id) {
+        setSelectedSessionId(response.data.id);
+        // 새 세션의 첫 메시지로 사용자 프롬프트 추가
+        await handleSendMessage(prompt);
+      }
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
+  };
+
+  // 주기적으로 새 메시지 확인 (30초마다)
+  useEffect(() => {
+    if (selectedSessionId) {
+      const interval = setInterval(async () => {
+        try {
+          const response = await api.get(API_PATHS.SESSION_MESSAGES(selectedSessionId));
+          if (response.data && Array.isArray(response.data)) {
+            const newMessages = response.data
+              .map((msg: any) => ({
+                role: msg.role,
+                content: msg.content,
+                id: msg.id,
+                timestamp: new Date(msg.created_at).getTime()
+              }))
+              .filter(msg => msg.timestamp > lastMessageTimestamp);
+            
+            if (newMessages.length > 0) {
+              setMessages(prevMessages => [...prevMessages, ...newMessages]);
+              const newTimestamp = Math.max(...newMessages.map(msg => msg.timestamp));
+              setLastMessageTimestamp(newTimestamp);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to check for new messages:', error);
+        }
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
+  }, [selectedSessionId, lastMessageTimestamp]);
+
+  // 메시지 검색 시 기존 메시지 유지
+  const handleSearch = async (query: string) => {
+    if (!selectedSessionId) return;
+
+    try {
+      const response = await api.get(`/sessions/${selectedSessionId}/messages/search`, {
+        params: { query }
+      });
+
+      // 검색 결과를 기존 메시지와 병합
+      setMessages(prevMessages => {
+        const existingIds = new Set(prevMessages.map(msg => msg.id));
+        const newMessages = response.data.filter((msg: Message) => !existingIds.has(msg.id));
+        return [...prevMessages, ...newMessages];
+      });
+    } catch (error) {
+      console.error('메시지 검색 실패:', error);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-screen">
       <Header />
-      <div className="flex flex-1">
-        <SessionList onSessionSelect={handleSessionSelect} selectedSessionId={selectedSessionId} />
+      <div className="flex flex-1 overflow-hidden">
+        <SessionList
+          onSessionSelect={setSelectedSessionId}
+          selectedSessionId={selectedSessionId}
+        />
         <div className="flex-1 flex flex-col">
-          <ChatWindow messages={messages} isLoading={loading} />
-          {error && (
-            <div className="p-2 bg-red-100 text-red-700 text-sm" data-testid="error-message">
-              {error}
-            </div>
-          )}
-          {saveStatus === 'saving' && (
-            <div className="p-2 bg-blue-100 text-blue-700 text-sm" data-testid="save-indicator">
-              저장 중...
-            </div>
-          )}
-          {saveStatus === 'saved' && (
-            <div className="p-2 bg-green-100 text-green-700 text-sm" data-testid="save-indicator">
-              저장 완료
-            </div>
-          )}
-          <PromptInput onSend={sendPrompt} loading={loading} disabled={!selectedSessionId} />
+          <ChatWindow
+            messages={messages}
+            isLoading={isLoading}
+          />
+          <PromptInput
+            onSend={handleSendMessage}
+            loading={isLoading}
+            disabled={!selectedSessionId}
+            onCreateSession={handleCreateSession}
+          />
         </div>
+        {selectedSessionId && (
+          <SemanticSearch sessionId={selectedSessionId} />
+        )}
       </div>
-      {selectedSessionId && <SemanticSearch sessionId={selectedSessionId} />}
     </div>
   );
 }

@@ -44,7 +44,7 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
     
     try {
       console.log('Searching with query:', query);
-      const response = await api.post<SearchResponse>(API_PATHS.QUERY, {
+      const response = await api.post<SearchResponse>('query/semantic_search', {
         query: query.trim(),
         session_id: sessionId,
         limit: 5
@@ -68,7 +68,7 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="fixed bottom-0 right-0 w-96 bg-white shadow-lg border-t border-l p-4">
+    <div className="fixed bottom-20 right-0 w-96 bg-white shadow-lg border-t border-l p-4">
       <h3 className="text-lg font-semibold mb-4">의미 검색</h3>
       <div className="flex gap-2 mb-4">
         <input
@@ -91,7 +91,9 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
       </div>
 
       {error && (
-        <div className="text-red-500 text-sm mb-4">{error}</div>
+        <div className="text-red-500 text-sm mb-4">
+          {error === 'Network Error' ? '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.' : error}
+        </div>
       )}
 
       {metadata && (

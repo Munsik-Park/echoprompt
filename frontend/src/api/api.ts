@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axiosInstance from './axios';
 
 // 환경 변수 타입 정의
 interface ViteEnv {
@@ -38,7 +38,7 @@ const API_URL = getEnvVar('VITE_API_URL');
 const API_VERSION = getEnvVar('VITE_API_VERSION');
 
 // API 클라이언트 생성
-const api = axios.create({
+const api = axiosInstance.create({
   baseURL: `${API_URL}/api/${API_VERSION}`,
   headers: {
     'Content-Type': 'application/json',
@@ -54,4 +54,5 @@ api.interceptors.response.use(
   }
 );
 
+// API 클라이언트 재사용
 export default api;

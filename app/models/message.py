@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 class MessageBase(SQLModel):
     """Common fields for a chat message."""
@@ -43,6 +44,12 @@ class MessageResponse(MessageBase):
         None,
         description="Last modification timestamp",
     )
+
+class MessagePairResponse(BaseModel):
+    """Response model for a pair of user and assistant messages."""
+
+    message: MessageResponse = Field(..., description="Assistant message")
+    user_message: MessageResponse = Field(..., description="User message")
 
 class MessageModel(MessageBase, table=True):
     """Database model for storing messages."""

@@ -13,9 +13,10 @@ from app.database import get_db
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.openai_client import get_openai_client
 from app.models.query import QueryRequest, QueryResponse
+from app.config import settings
 
 router = APIRouter(
-    prefix="/api/v1/query",
+    prefix=f"{settings.API_PREFIX}/query",
     tags=["Query"]
 )
 
@@ -47,12 +48,14 @@ async def semantic_search(
 
         # 쿼리 임베딩 생성
         try:
+            print(f"임베딩 모델: {settings.OPENAI_EMBEDDING_MODEL}")
             response = openai_client.embeddings.create(
                 input=request.query,
-                model="text-embedding-ada-002"
+                model=settings.OPENAI_EMBEDDING_MODEL
             )
             query_embedding = response.data[0].embedding
         except Exception as e:
+            print(f"임베딩 생성 에러: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=ErrorResponse(
@@ -69,7 +72,9 @@ async def semantic_search(
                 session_id=request.session_id,
                 limit=request.limit
             )
+            print(f"검색 결과: {search_results}")
         except Exception as e:
+            print(f"Qdrant 검색 에러: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=ErrorResponse(
@@ -96,17 +101,23 @@ async def semantic_search(
             )
 
         # 검색 결과 변환
-        results = [
-            SemanticSearchResult(
-                id=str(result["id"]),
-                score=result["score"],
-                payload={
-                    "content": result["content"],
-                    "role": result["role"]
-                }
-            )
-            for result in search_results
-        ]
+        results = []
+        for result in search_results:
+            try:
+                payload = result.get("payload", {})
+                results.append(
+                    SemanticSearchResult(
+                        id=str(result.get("id")),
+                        score=result.get("score", 0.0),
+                        payload={
+                            "content": payload.get("content", ""),
+                            "role": payload.get("role", "unknown")
+                        }
+                    )
+                )
+            except Exception as e:
+                print(f"결과 변환 에러: {str(e)}, 결과: {result}")
+                continue
 
         # 점수 범위 계산
         scores = [result.score for result in results]
@@ -129,6 +140,7 @@ async def semantic_search(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"의미 검색 에러: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorResponse(

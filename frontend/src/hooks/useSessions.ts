@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import api from '../api/api';
 import { API_PATHS } from '../api/constants';
 import { Session } from '../types/session';
+import { AxiosError } from 'axios';
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000; // 대기 시간 증가
-const API_TIMEOUT = 10000; // 타임아웃 증가
+const MAX_RETRIES = 2;  // 재시도 횟수 감소
+const RETRY_DELAY = 1000;  // 재시도 대기 시간 감소
+const API_TIMEOUT = 5000;  // API 타임아웃 감소
 
 export const useSessions = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -17,8 +18,17 @@ export const useSessions = () => {
       setLoading(true);
       console.log(`Fetching sessions... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
       
-      const response = await api.get<Session[]>(API_PATHS.SESSIONS, {
-        timeout: API_TIMEOUT
+      // 캐시를 완전히 무시하기 위해 타임스탬프 추가
+      const timestamp = new Date().getTime();
+      const response = await api.get<Session[]>(`${API_PATHS.SESSIONS}?_t=${timestamp}`, {
+        timeout: API_TIMEOUT,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'If-None-Match': '',
+          'If-Modified-Since': ''
+        }
       });
       
       console.log('Sessions response:', response.data);
@@ -32,6 +42,14 @@ export const useSessions = () => {
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
       
+      // 404 에러나 빈 응답은 정상적인 초기 상태로 처리
+      if (err instanceof AxiosError && (err.response?.status === 404 || !err.response)) {
+        setSessions([]);
+        setError(null);
+        return;
+      }
+      
+      // 다른 에러의 경우에만 재시도
       if (retryCount < MAX_RETRIES - 1) {
         console.log(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
         setTimeout(() => fetchSessions(retryCount + 1), RETRY_DELAY);
@@ -45,13 +63,6 @@ export const useSessions = () => {
 
   useEffect(() => {
     fetchSessions();
-    
-    // 주기적으로 세션 목록 갱신
-    const intervalId = setInterval(() => {
-      fetchSessions();
-    }, 5000); // 5초마다 갱신
-    
-    return () => clearInterval(intervalId);
   }, []);
 
   return { sessions, loading, error, refetch: () => fetchSessions() };

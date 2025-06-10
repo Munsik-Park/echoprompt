@@ -2,6 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import session_router, query_router, chat_router
 from app.database import create_db_and_tables
+from app.config import settings
+import os
+
+# 필수 환경 변수 확인
+if not os.getenv('VITE_FRONTEND_PORT'):
+    raise ValueError("VITE_FRONTEND_PORT environment variable is not set")
 
 app = FastAPI(
     title="EchoPrompt API",
@@ -12,7 +18,11 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 프론트엔드 URL
+    allow_origins=[
+        settings.FRONTEND_URL,
+        f"http://localhost:{os.getenv('VITE_FRONTEND_PORT')}",
+        f"http://127.0.0.1:{os.getenv('VITE_FRONTEND_PORT')}"
+    ],  # 프론트엔드 URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -8,9 +8,10 @@ from app.models.message import MessageModel
 from app.models.chat import ChatRequest, ChatResponse
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.openai_client import get_openai_client
+from app.config import settings
 
 router = APIRouter(
-    prefix="/api/v1/chat",
+    prefix=f"{settings.API_PREFIX}/chat",
     tags=["Chat"]
 )
 
@@ -65,7 +66,7 @@ async def chat(
 
         # OpenAI API 호출
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=settings.OPENAI_CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": f"Context: {context}\n\nUser: {request.prompt}"}

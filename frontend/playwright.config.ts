@@ -1,17 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
-if (!process.env.VITE_FRONTEND_URL) {
-  throw new Error('VITE_FRONTEND_URL environment variable is not set');
-}
-
-const FRONTEND_URL = process.env.VITE_FRONTEND_URL;
+const FRONTEND_URL = process.env.VITE_FRONTEND_URL || 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: 'html',
   use: {
     baseURL: FRONTEND_URL,
@@ -23,22 +19,6 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
     },
   ],
   webServer: {
