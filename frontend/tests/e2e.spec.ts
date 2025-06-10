@@ -66,16 +66,34 @@ test.describe('EchoPrompt E2E', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     await page.goto(FRONTEND_URL);
     const session = await createSession(apiContext, testInfo.title);
+    await page.waitForTimeout(1500);
+    await page.reload();
+    await page.waitForTimeout(1000);
     await selectSession(page, session.id);
   });
 
   test('send message and receive response', async ({ page }) => {
     const input = page.locator('[data-testid="prompt-input"]');
-    const message = '서울에서 뉴욕까지 몇 km인가요?';
+    const cities = [
+      'New York',
+      'London',
+      'Tokyo',
+      'Paris',
+      'Cairo',
+      'Sydney',
+      'Moscow',
+      'Toronto',
+      'Berlin',
+      'Seoul',
+    ];
+    const [cityA, cityB] = [...cities].sort(() => 0.5 - Math.random()).slice(0, 2);
+    const message = `${cityA}에서 ${cityB}까지의 거리는 얼마인가요?`;
 
     await input.fill(message);
     console.log('사용자 메시지 입력 및 전송');
     await input.press('Enter');
+
+    await page.waitForTimeout(4500);
 
     console.log('하이라이팅 감지 시작');
     await waitForHighlight(page, message);
@@ -90,11 +108,13 @@ test.describe('EchoPrompt E2E', () => {
     await input.fill(msg);
     console.log('사용자 메시지 입력 및 전송');
     await input.press('Enter');
+    await page.waitForTimeout(4500);
     await expect(page.locator('[data-testid="message-assistant-0"]')).toBeVisible();
 
     const searchInput = page.locator('[data-testid="search-input"]');
     await searchInput.fill('하이라이트');
     await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
     await expect(page.locator('[data-testid^="search-result-"]')).toHaveCount(1);
     console.log('하이라이팅 감지 시작');
     await waitForHighlight(page, '하이라이트');
