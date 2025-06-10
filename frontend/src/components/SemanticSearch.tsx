@@ -117,7 +117,11 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
           <h3 className="text-lg font-semibold mb-2">검색 결과</h3>
           <ul className="space-y-2">
             {results.map((result, index) => (
-              <li key={index} className="p-3 bg-gray-50 rounded">
+              <li
+                key={index}
+                className="p-3 bg-gray-50 rounded"
+                data-testid="search-result-item"
+              >
                 <p className="text-sm text-gray-600">{result.payload.content}</p>
                 <p className="text-xs text-gray-400 mt-1">유사도: {(result.score * 100).toFixed(2)}%</p>
               </li>
