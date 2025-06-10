@@ -59,28 +59,62 @@ test.describe('Semantic search after sending message', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     await page.goto(FRONTEND_URL);
     const session = await createSession(apiContext, testInfo.title);
+
+    // Reload to verify session persistence
+    await page.reload();
+    await page.waitForTimeout(1000);
+    const sessionItems = page.locator('[data-testid^="session-"]');
+    const sessionCount = await sessionItems.count();
+    if (sessionCount === 0) {
+      throw new Error('세션 생성 실패로 이후 테스트를 진행할 수 없습니다.');
+    }
+
     await selectSession(page, session.id);
   });
 
   test('message appears in semantic search results', async ({ page }) => {
-    const cities = ['부산', '대구', '광주'];
+    const cities = [
+      'New York',
+      'London',
+      'Tokyo',
+      'Paris',
+      'Cairo',
+      'Sydney',
+      'Moscow',
+      'Toronto',
+      'Berlin',
+      'Seoul',
+    ];
 
-    for (const city of cities) {
-      const message = `서울에서 ${city}까지의 거리는 몇 km야?`;
+    function getRandomPair(arr: string[]) {
+      const shuffled = [...arr].sort(() => 0.5 - Math.random());
+      return [shuffled[0], shuffled[1]] as const;
+    }
 
+    const testCases = Array.from({ length: 3 }).map(() => {
+      const [cityA, cityB] = getRandomPair(cities);
+      return { city: cityB, message: `${cityA}에서 ${cityB}까지의 거리는 몇 km야?` };
+    });
+
+    for (const { city, message } of testCases) {
       const input = page.locator('[data-testid="prompt-input"]');
       await input.fill(message);
       await input.press('Enter');
 
-      // 충분한 대기 시간
+      // 임베딩/저장 대기
       await page.waitForTimeout(2000);
 
       const searchInput = page.locator('[data-testid="search-input"]');
       await searchInput.fill(city);
       await searchInput.press('Enter');
 
-      const results = page.locator('[data-testid="search-result-item"]');
-      await expect(results).toContainText(message);
+      await page.waitForTimeout(1000);
+      const results = await page
+        .locator('[data-testid="search-result-item"]')
+        .allTextContents();
+      console.log('검색 결과:', results);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.some((r) => r.includes(message))).toBe(true);
     }
   });
 });

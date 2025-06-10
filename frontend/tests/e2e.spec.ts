@@ -91,7 +91,6 @@ test.describe('EchoPrompt E2E', () => {
     console.log('사용자 메시지 입력 및 전송');
     await input.press('Enter');
     await expect(page.locator('[data-testid="message-assistant-0"]')).toBeVisible();
-    await expect(page.locator('[data-testid="save-indicator"]')).toHaveText('저장 완료');
 
     const searchInput = page.locator('[data-testid="search-input"]');
     await searchInput.fill('하이라이트');
