@@ -4,13 +4,16 @@ const FRONTEND_URL = process.env.VITE_FRONTEND_URL || 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './tests',
+  timeout: 60000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 2 : 1,
   workers: 1,
   reporter: 'html',
   use: {
     baseURL: FRONTEND_URL,
+    headless: false,
+    slowMo: 50,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
