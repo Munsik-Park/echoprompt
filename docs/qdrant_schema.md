@@ -1,70 +1,49 @@
+# Qdrant Vector Schema Definition
 
-# 📌 GitHub Issues for Multi-Agent Project Contribution (Cursor, Codex, Jules)
+This document outlines the structure of the vector schema used in our Qdrant collections.
 
----
+## Schema Fields
 
-## 🧩 Issue 1: [Cursor] 기존 FastAPI 백엔드에 새로운 Qdrant 스키마 통합
+The schema is designed to support efficient semantic search and retrieval for a Retrieval Augmented Generation (RAG) system. Each vector stored in Qdrant will adhere to the following structure:
 
-**🎯 목표**  
-기존 `query_router.py` 및 `qdrant_client.py` 코드에 새로운 `VectorPayload` 구조를 반영하고, 불필요한 필드를 제거하며 전체 삽입/검색 흐름을 업데이트합니다.
+| Field Name    | Data Type        | Description                                                                 | Example                                           | Notes                                                                      |
+|---------------|------------------|-----------------------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------------------------------|
+| `id`          | UUID/Integer     | Unique identifier for the vector point.                                     | `6a2f4b8e-9c3d-1e7f-b0a5-3d2c1e7f0b9a`            | Qdrant automatically assigns an ID if not provided.                        |
+| `vector`      | Array of Float   | The embedding vector representing the semantic meaning of the text.         | `[0.123, -0.456, 0.789, ...]`                     | The dimension of the vector depends on the embedding model used.           |
+| `payload`     | Object           | A JSON object containing the metadata and actual content associated with the vector. | See Payload Fields section below.                 | This is where all queryable and retrievable data, apart from the vector itself, is stored. |
 
-**✅ 작업 항목**
-- [ ] `routers/query_router.py`에서 `payload` 구성 필드를 `VectorPayload`에 맞게 수정
-- [ ] `qdrant_client.py` 내 insert/search 관련 함수 리팩토링
-- [ ] `summary`, `token_count`, `memory_type` 필드 반영
-- [ ] 환경 변수로부터 `embedding_model` 가져오는 로직 추가
-- [ ] 전체 삽입 → 검색 → 응답 흐름 테스트
+## Payload Fields
 
-**📎 참고**
-- 스키마 정의 문서: `docs/qdrant_schema.md`
-- 기존 삽입 함수: `qdrant_client.py`
+The `payload` object contains the following fields:
 
----
+| Field Name      | Data Type     | Description                                                                                      | Example                                  | Notes                                                                                                |
+|-----------------|---------------|--------------------------------------------------------------------------------------------------|------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `text`          | String        | The original text chunk that was vectorized.                                                     | "This is a sample text for the vector."  | This is the content that will be used in the context for the LLM.                                    |
+| `document_id`   | String        | Identifier for the source document from which the text was extracted.                            | "doc_001"                                | Useful for tracing back the origin of the information.                                               |
+| `chunk_id`      | String/Integer| Identifier for the specific chunk within the source document.                                    | "chunk_003" or `3`                       | Helps in uniquely identifying parts of a larger document.                                            |
+| `memory_type`   | String        | Indicates the type of memory this vector represents.                                             | "short_term", "long_term", "summary"     | Crucial for implementing the tiered search flow (short_term → summary → long_term).                  |
+| `user_id`       | String        | Identifier for the user associated with this memory (if applicable).                             | "user_abc_123"                           | For personalization or multi-tenant scenarios. Can be optional.                                      |
+| `session_id`    | String        | Identifier for the session during which this memory was created (if applicable).                 | "session_xyz_789"                        | For tracking conversation context. Can be optional.                                                  |
+| `message_id`    | String        | Identifier for the specific message that generated this vector (if applicable).                  | "msg_1a2b3c"                             | For fine-grained tracking. Can be optional.                                                          |
+| `token_count`   | Integer       | The number of tokens in the `text` field, calculated using the tokenizer (e.g., tiktoken).       | `42`                                     | Useful for managing context window limits and for analytics.                                       |
+| `created_at`    | Timestamp     | The timestamp when the vector was created/inserted.                                              | "2023-10-27T10:30:00Z"                   | For time-based filtering or sorting.                                                                 |
+| `source`        | String        | The original source of the information (e.g., file name, URL, application module).             | "internal_docs/feature_x.md"             | Provides context about where the information came from. Can be optional.                             |
+| `metadata`      | Object        | A flexible field for any other relevant metadata not covered by the above fields.                | `{"custom_tag": "urgent", "version": 1.2}` | Allows for extensibility without altering the core schema.                                           |
 
-## ⚙️ Issue 2: [Codex] 벡터 저장용 스키마 및 삽입/검색/요약 함수 생성
+## Collections
 
-**🎯 목표**  
-Qdrant에 벡터를 저장하고 검색하는 데 필요한 Pydantic 모델 및 함수들을 새로 생성합니다.
+We will utilize distinct collections based on the `memory_type` or manage different memory types within a single collection using filtering on the `memory_type` payload field. The specific strategy will depend on the querying requirements and performance considerations.
 
-**✅ 작업 항목**
-- [ ] `models/vector_payload.py` 생성 및 `VectorPayload` 클래스 정의
-- [ ] `utils/token_utils.py`에 `count_tokens(text)` 함수 구현 (tiktoken 기반)
-- [ ] `qdrant_client.py`에 `insert_vector()`, `search_vectors()` 함수 새로 작성
-- [ ] 간단한 FastAPI 라우터 예제 작성 (선택)
+Common collections might include:
 
-**📎 참고 예시**
-```python
-class VectorPayload(BaseModel):
-    user_id: str
-    session_id: int
-    message_id: int
-    ...
-```
+*   `short_term_memory`: Stores recent interactions or volatile data.
+*   `long_term_memory`: Stores persistent knowledge base or historical data.
+*   `summary_memory`: Stores summaries of conversations or documents.
 
----
+Alternatively, a single collection (e.g., `unified_memory`) could be used with a filter on `payload.memory_type`.
 
-## 🧠 Issue 3: [Jules] 스키마 구조 및 검색 흐름 문서화
+## Indexing
 
-**🎯 목표**  
-전체 시스템의 검색 흐름 및 벡터 스키마 구조를 명확하게 문서화합니다.
+Payload fields that are frequently used in filtering queries (e.g., `memory_type`, `user_id`, `document_id`) should be indexed in Qdrant to ensure fast and efficient retrieval.
 
-**✅ 작업 항목**
-- [ ] `docs/qdrant_schema.md` 작성 (필드별 설명 포함)
-- [ ] `docs/search_flow.md` 작성 (short_term → long_term → summary 흐름)
-- [ ] README에 "Qdrant 기반 의미 검색 구조" 섹션 추가
-- [ ] 테스트 시나리오 명세 (`docs/use_cases.md`)
-
-**📎 예시 흐름**
-```text
-[ 사용자 질의 입력 ]
-      ↓
-[ 1차 검색: short_term ]
-      ↓
-[ 2차 검색: summary ]
-      ↓
-[ 컨텍스트 구성 → LLM 호출 ]
-```
-
----
-
-각 이슈는 레포지토리에 직접 등록하거나, GitHub CLI / REST API로 자동 등록 가능합니다.
+This schema provides a comprehensive framework for storing and querying vectorized content along with its associated metadata, enabling a sophisticated semantic search system.
