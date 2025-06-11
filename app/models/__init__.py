@@ -1,5 +1,5 @@
 from .session import SessionModel, SessionCreate, SessionUpdate, SessionResponse
-from .message import MessageModel, MessageCreate, MessageUpdate, MessageResponse
+from .message import MessageModel, MessageCreate, MessageUpdate, MessageResponse, MessagePairResponse
 from .query import (
     QueryRequest,
     QueryResponse,
@@ -8,6 +8,7 @@ from .query import (
     SemanticSearchResponse,
 )
 from .chat import ChatRequest, ChatResponse
+from .error import ErrorResponse, ErrorCode
 
 __all__ = [
     'SessionModel',
@@ -18,12 +19,15 @@ __all__ = [
     'MessageCreate',
     'MessageUpdate',
     'MessageResponse',
+    'MessagePairResponse',
     'QueryRequest',
     'QueryResponse',
     'SemanticSearchRequest',
     'SemanticSearchResult',
     'SemanticSearchResponse',
     'ChatRequest',
-    'ChatResponse'
+    'ChatResponse',
+    'ErrorResponse',
+    'ErrorCode'
 ]
  

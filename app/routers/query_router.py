@@ -1,18 +1,20 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request, Form
 from sqlalchemy.orm import Session
 from app.models import (
     SessionModel,
+    MessageModel,
+    QueryRequest,
+    QueryResponse,
     SemanticSearchRequest,
     SemanticSearchResult,
     SemanticSearchResponse,
-    MessageModel,
+    ErrorResponse,
+    ErrorCode
 )
-from app.models.error import ErrorResponse, ErrorCode
 from app.database import get_db
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.openai_client import get_openai_client
-from app.models.query import QueryRequest, QueryResponse
 from app.config import settings
 
 router = APIRouter(
@@ -35,6 +37,14 @@ async def semantic_search(
 ):
     """세션 내에서 의미 기반 검색을 수행합니다."""
     try:
+        # 디버그 로깅 추가
+        print(f"[DEBUG] 요청 데이터:")
+        print(f"- session_id: {request.session_id}")
+        print(f"- query: {request.query}")
+        print(f"- limit: {request.limit}")
+        print(f"- request type: {type(request)}")
+        print(f"- request dict: {request.dict()}")
+
         # 세션 존재 여부 확인
         session = db.query(SessionModel).filter(SessionModel.id == request.session_id).first()
         if not session:
@@ -105,16 +115,15 @@ async def semantic_search(
         for result in search_results:
             try:
                 payload = result.get("payload", {})
-                results.append(
-                    SemanticSearchResult(
-                        id=str(result.get("id")),
-                        score=result.get("score", 0.0),
-                        payload={
-                            "content": payload.get("content", ""),
-                            "role": payload.get("role", "unknown")
-                        }
-                    )
+                search_result = SemanticSearchResult(
+                    id=str(result.get("id")),
+                    score=float(result.get("score", 0.0)),
+                    payload={
+                        "content": str(payload.get("content", "")),
+                        "role": str(payload.get("role", "unknown"))
+                    }
                 )
+                results.append(search_result)
             except Exception as e:
                 print(f"결과 변환 에러: {str(e)}, 결과: {result}")
                 continue
@@ -124,9 +133,17 @@ async def semantic_search(
         min_score = min(scores) if scores else None
         max_score = max(scores) if scores else None
 
-        return SemanticSearchResponse(
+        # 전체 검색 결과 수 계산 (limit 제한 없이)
+        total_results = qdrant_client.search_similar(
+            query=request.query,
+            session_id=request.session_id,
+            limit=None
+        )
+        total_count = len(total_results)
+
+        response = SemanticSearchResponse(
             results=results,
-            total=len(results),
+            total=total_count,
             status="success",
             message="Search completed successfully",
             metadata={
@@ -137,6 +154,7 @@ async def semantic_search(
                 "max_score": max_score
             }
         )
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -201,18 +219,3 @@ def query(
                 details={"error": str(e)}
             ).dict()
         )
-
-@router.get("/search")
-async def semantic_search(
-    query: str,
-    session_id: int,
-    limit: int = 5,
-    qdrant_client: QdrantClientWrapper = Depends(get_qdrant_client)
-):
-    """Perform semantic search on messages in a session."""
-    results = qdrant_client.search(
-        query=query,
-        session_id=session_id,
-        limit=limit
-    )
-    return results

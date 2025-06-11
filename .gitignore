@@ -213,5 +213,6 @@ package-lock.json
 
 frontend/test-results/
 frontend/playwright-report/
+frontend/error-*.png
 .vscode/
 

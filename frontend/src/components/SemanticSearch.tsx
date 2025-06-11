@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api/api';
 import { API_PATHS } from '../api/constants';
 
@@ -21,6 +21,7 @@ interface SearchMetadata {
 interface SearchResponse {
   results: SearchResult[];
   metadata: SearchMetadata;
+  total: number;
 }
 
 interface SemanticSearchProps {
@@ -34,6 +35,24 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<SearchMetadata | null>(null);
 
+  useEffect(() => {
+    console.log('Rendering condition check:', {
+      loading,
+      notLoading: !loading,
+      resultsLength: results.length,
+      shouldRender: !loading && results.length > 0
+    });
+  }, [loading, results]);
+
+  useEffect(() => {
+    console.log('Rendering condition values:', {
+      loading,
+      resultsLength: results.length,
+      shouldRender: !loading && results.length > 0,
+      timestamp: new Date().toISOString()
+    });
+  }, [loading, results]);
+
   const handleSearch = async () => {
     if (!query.trim()) return;
     
@@ -43,6 +62,14 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
     setMetadata(null);
     
     try {
+      console.log('Search state before API call:', {
+        query,
+        loading: true,
+        resultsLength: 0,
+        metadata: null,
+        timestamp: new Date().toISOString()
+      });
+
       console.log('Searching with query:', query);
       const response = await api.post<SearchResponse>('query/semantic_search', {
         query: query.trim(),
@@ -50,6 +77,7 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
         limit: 5
       });
       console.log('Search response:', response.data);
+      console.log('Metadata from response:', response.data.metadata);
       
       if (!response.data.results || response.data.results.length === 0) {
         console.log('No search results found');
@@ -57,8 +85,23 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
         return;
       }
       
+      // 결과와 메타데이터를 동시에 설정
+      const newMetadata = {
+        ...response.data.metadata,
+        total: response.data.total
+      };
+      
       setResults(response.data.results);
-      setMetadata(response.data.metadata);
+      setMetadata(newMetadata);
+      
+      console.log('Search state after setting results:', {
+        query,
+        loading: false,
+        resultsLength: response.data.results.length,
+        metadata: newMetadata,
+        timestamp: new Date().toISOString()
+      });
+      
     } catch (err) {
       console.error('Search error:', err);
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
@@ -119,7 +162,7 @@ const SemanticSearch: React.FC<SemanticSearchProps> = ({ sessionId }) => {
             {results.map((result, index) => (
               <li
                 key={index}
-                className="p-3 bg-gray-50 rounded"
+                className="p-3 bg-gray-50 rounded highlighted-result"
                 data-testid="search-result-item"
               >
                 <p className="text-sm text-gray-600">{result.payload.content}</p>

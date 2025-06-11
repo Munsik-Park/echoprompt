@@ -81,21 +81,27 @@ function App() {
         timestamp: response.data.message?.created_at || response.data.created_at || Date.now()
       };
 
-      // 5. 사용자 메시지 ID 업데이트 및 어시스턴트 메시지 추가
+      // 5. 메시지 목록 업데이트
       setMessages(prevMessages => {
+        // 이전 메시지 중 사용자 메시지 ID 업데이트
         const updatedMessages = prevMessages.map(msg => 
           msg.id === userMessage.id 
             ? { ...msg, id: response.data.message?.id || response.data.id }
             : msg
         );
+        
+        // 어시스턴트 메시지 추가
         return [...updatedMessages, assistantMessage];
       });
+
+      // 6. 메시지 목록 새로고침
+      await fetchMessages(selectedSessionId);
 
     } catch (error) {
       console.error('메시지 전송 실패:', error);
       setError('메시지 전송 중 오류가 발생했습니다.');
       
-      // 6. 오류 발생 시 사용자 메시지 제거
+      // 7. 오류 발생 시 사용자 메시지 제거
       setMessages(prevMessages => 
         prevMessages.filter(msg => msg.id !== userMessage.id)
       );

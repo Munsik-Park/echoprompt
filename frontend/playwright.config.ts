@@ -9,7 +9,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
   workers: 1,
-  reporter: 'html',
+  reporter: [
+    ['html'],
+    ['list', { printSteps: true }]
+  ],
   use: {
     baseURL: FRONTEND_URL,
     headless: false,
@@ -17,6 +20,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    logger: {
+      isEnabled: (name, severity) => true,
+      log: (name, severity, message, args) => console.log(`${name} ${message}`)
+    }
   },
   projects: [
     {

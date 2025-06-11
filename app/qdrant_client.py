@@ -130,17 +130,20 @@ class QdrantClientWrapper:
         self,
         query: str,
         session_id: int,
-        limit: int = 5
+        limit: Optional[int] = 5
     ) -> List[Dict[str, Any]]:
         self._ensure_collection(session_id)
         collection_name = f"session_{session_id}"
         
         query_embedding = self.get_embedding(query)
         
+        # limit이 None이면 기본값 5 사용
+        search_limit = limit if limit is not None else 5
+        
         search_result = self.client.search(
             collection_name=collection_name,
             query_vector=query_embedding,
-            limit=limit
+            limit=search_limit
         )
         
         return [

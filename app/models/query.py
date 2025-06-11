@@ -20,12 +20,18 @@ class SemanticSearchRequest(BaseModel):
     query: str = Field(..., description="Query text", example="Hello")
     limit: int = Field(5, description="Number of results to return", example=5)
 
+    class Config:
+        from_attributes = True
+
 class SemanticSearchResult(BaseModel):
     """Single search result with similarity score."""
 
     id: str = Field(..., description="Message ID")
     score: float = Field(..., description="Similarity score")
     payload: Dict[str, str] = Field(..., description="Message payload containing content and role")
+
+    class Config:
+        from_attributes = True
 
 class SemanticSearchResponse(BaseModel):
     """Semantic search response."""
@@ -44,5 +50,8 @@ class SemanticSearchResponse(BaseModel):
         },
         description="Search metadata"
     )
+
+    class Config:
+        from_attributes = True
 
  

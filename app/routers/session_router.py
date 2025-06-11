@@ -2,9 +2,19 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, Path, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.session import SessionModel, SessionCreate, SessionUpdate, SessionResponse
-from app.models.message import MessageModel, MessageCreate, MessageUpdate, MessageResponse, MessagePairResponse
-from app.models.error import ErrorResponse, ErrorCode
+from app.models import (
+    SessionModel,
+    SessionCreate,
+    SessionUpdate,
+    SessionResponse,
+    MessageModel,
+    MessageCreate,
+    MessageUpdate,
+    MessageResponse,
+    MessagePairResponse,
+    ErrorResponse,
+    ErrorCode
+)
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.config import settings
 from datetime import datetime

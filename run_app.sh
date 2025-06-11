@@ -6,8 +6,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# 환경 변수 파일 경로
-ENV_FILE=".env"
+# 프로젝트 루트 디렉토리로 이동
+cd "$(dirname "$0")"
+
+# 환경 변수 로드
+source reset_env.sh
 
 # 필수 환경 변수 목록 (기본 환경 변수)
 REQUIRED_ENV_VARS=(
@@ -21,27 +24,6 @@ REQUIRED_ENV_VARS=(
     "OPENAI_EMBEDDING_MODEL"
     "DATABASE_URL"
 )
-
-# 환경 변수 파일이 존재하는지 확인
-if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}Error: .env file not found${NC}"
-    echo -e "${YELLOW}Please run setup_env.sh first to set up environment variables${NC}"
-    exit 1
-fi
-
-# 환경 변수 파일 로드
-echo "Loading environment variables from .env file..."
-while IFS='=' read -r key value; do
-    # 주석이나 빈 줄 무시
-    [[ $key =~ ^#.*$ ]] && continue
-    [[ -z $key ]] && continue
-    
-    # 따옴표 제거
-    value=$(echo "$value" | tr -d '"' | tr -d "'")
-    
-    # 환경 변수 설정
-    export "$key=$value"
-done < "$ENV_FILE"
 
 # 기본 환경 변수 확인
 echo "Checking basic environment variables..."

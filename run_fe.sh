@@ -5,32 +5,18 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# 프로젝트 루트 디렉토리로 이동
+cd "$(dirname "$0")"
+
+# 환경 변수 로드
+source reset_env.sh
+
 # 필수 환경 변수 목록
 REQUIRED_ENV_VARS=(
     "VITE_API_URL"
     "VITE_API_VERSION"
     "VITE_FRONTEND_URL"
 )
-
-# .env 파일 존재 확인
-if [ ! -f .env ]; then
-    echo -e "${RED}Error: .env file not found${NC}"
-    exit 1
-fi
-
-# .env 파일에서 환경 변수 로드
-echo "Loading environment variables from .env file..."
-while IFS='=' read -r key value; do
-    # 주석이나 빈 줄 무시
-    [[ $key =~ ^#.*$ ]] && continue
-    [[ -z $key ]] && continue
-    
-    # 따옴표 제거
-    value=$(echo "$value" | tr -d '"' | tr -d "'")
-    
-    # 환경 변수 설정
-    export "$key=$value"
-done < .env
 
 # 필수 환경 변수 확인
 echo "Checking required environment variables..."

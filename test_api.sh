@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# 프로젝트 루트 디렉토리로 이동
+cd "$(dirname "$0")"
+
+# 환경 변수 로드
+source reset_env.sh
+
 if [ -z "$VITE_API_URL" ]; then
     echo "Error: VITE_API_URL environment variable is not set"
     exit 1

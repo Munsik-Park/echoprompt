@@ -3,9 +3,14 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 
 from app.database import get_db
-from app.models.session import SessionModel
-from app.models.message import MessageModel
-from app.models.chat import ChatRequest, ChatResponse
+from app.models import (
+    SessionModel,
+    MessageModel,
+    ChatRequest,
+    ChatResponse,
+    ErrorResponse,
+    ErrorCode
+)
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.openai_client import get_openai_client
 from app.config import settings
