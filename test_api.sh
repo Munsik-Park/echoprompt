@@ -1,8 +1,16 @@
 #!/bin/bash
 set -e
 
+# 공통 함수 로드
+source "$(dirname "$0")/utils.sh"
+
 # 프로젝트 루트 디렉토리로 이동
 cd "$(dirname "$0")"
+
+# 가상 환경 확인
+if ! check_venv; then
+    exit 1
+fi
 
 # 환경 변수 로드
 source reset_env.sh
@@ -21,29 +29,12 @@ fi
 BASE_URL="$VITE_API_URL"
 API_URL="$VITE_API_URL/api/$VITE_API_VERSION"
 
-# 서버 상태 확인 함수
-check_server() {
-    local max_attempts=3
-    local attempt=1
-    local wait_time=2
-
-    echo "서버 상태 확인 중..."
-    while [ $attempt -le $max_attempts ]; do
-        if curl -s -f "$BASE_URL/docs" > /dev/null; then
-            echo "✅ 서버가 정상적으로 실행 중입니다."
-            return 0
-        fi
-        echo "서버 시작 대기 중... (시도 $attempt/$max_attempts)"
-        sleep $wait_time
-        attempt=$((attempt + 1))
-    done
-    
-    echo "❌ 서버가 응답하지 않습니다."
-    return 1
-}
+# API 문서 디렉토리 설정
+API_DOCS_DIR="frontend/tests/api"
+mkdir -p "$API_DOCS_DIR"
 
 # 서버 상태 확인
-if ! check_server; then
+if ! check_server "$BASE_URL/docs"; then
     echo "서버를 시작해주세요."
     exit 1
 fi
@@ -58,11 +49,11 @@ else
 fi
 
 echo -e "\n2. OpenAPI Spec 다운로드"
-if curl -s -f -o openapi.json "$BASE_URL/openapi.json"; then
+if curl -s -f -o "$API_DOCS_DIR/openapi.json" "$BASE_URL/openapi.json"; then
     echo "✅ OpenAPI Spec 다운로드 성공"
     # OpenAPI Spec에서 엔드포인트 목록 추출
     echo -e "\n3. API 엔드포인트 목록:"
-    grep -o '"path":"[^"]*"' openapi.json | sed 's/"path":"//g' | sed 's/"//g'
+    grep -o '"path":"[^"]*"' "$API_DOCS_DIR/openapi.json" | sed 's/"path":"//g' | sed 's/"//g'
 else
     echo "❌ OpenAPI Spec 다운로드 실패"
     exit 1
@@ -121,6 +112,6 @@ DELETE_SESSION_RESPONSE=$(curl -s -X DELETE "$API_URL/sessions/$SESSION_ID")
 echo "응답 상태 코드: $?"
 
 # OpenAPI Spec 정리
-rm -f openapi.json
+rm -f "$API_DOCS_DIR/openapi.json"
 
 echo "[SUCCESS] 모든 API 테스트가 정상적으로 완료되었습니다." 

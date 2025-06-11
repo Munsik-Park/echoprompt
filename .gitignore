@@ -197,6 +197,10 @@ cython_debug/
 nohup.out
 echoprompt.db
 
+# API Test files
+frontend/tests/api/openapi.json
+frontend/tests/api/*.json
+
 # Node.js
 node_modules/
 
@@ -210,9 +214,22 @@ package-lock.json
 .env.test.local
 .env.production.local
 
-
+# Test results and reports
 frontend/test-results/
 frontend/playwright-report/
+
+# Test screenshots
 frontend/error-*.png
+frontend/test-screenshots/
+
+# Test logs
+fe.log
+be.log
+*.test.log
+
+# Temporary files
+nohup.out
+*.tmp
+
 .vscode/
 

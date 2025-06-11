@@ -6,8 +6,27 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+
 # 프로젝트 루트 디렉토리로 이동
 cd "$(dirname "$0")"
+
+# 가상 환경 확인 함수
+check_venv() {
+    if [ -n "$VIRTUAL_ENV" ]; then
+        echo "✅ 가상 환경이 활성화되어 있습니다: $VIRTUAL_ENV"
+        return 0
+    else
+        echo "❌ 가상 환경이 활성화되어 있지 않습니다"
+        echo "다음 명령어로 가상 환경을 활성화하세요:"
+        echo "source venv/bin/activate"
+        return 1
+    fi
+}
+
+# 스크립트 시작 시 가상 환경 확인
+if ! check_venv; then
+    exit 1
+fi
 
 # 환경 변수 로드
 source reset_env.sh
