@@ -146,6 +146,17 @@ bash test_api.sh
 ### Query
 - `POST /query/semantic_search` - Search messages semantically within a session
 
+## Qdrant-based Semantic Search Structure
+
+Our system leverages Qdrant to perform semantic search, enabling more relevant and contextual results for user queries. This is a core component of our Retrieval Augmented Generation (RAG) pipeline.
+
+The search architecture involves multiple stages and different types of memory collections to optimize the information retrieved for the LLM.
+
+-   **Vector Schema**: The structure of our vectors in Qdrant is crucial for storing text, metadata, and enabling efficient search. For a detailed definition of the schema, please see [`docs/qdrant_schema.md`](docs/qdrant_schema.md).
+-   **Search Flow**: The process of how a user query is handled, how different memory types (short-term, summary, long-term) are queried, and how context is assembled for the LLM is documented in detail. For a comprehensive understanding of this flow, please refer to [`docs/search_flow.md`](docs/search_flow.md).
+
+Understanding these two documents will provide a clear picture of how semantic search is implemented and utilized within the application.
+
 ## Development
 
 - Code formatting: Black
