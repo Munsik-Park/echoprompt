@@ -126,6 +126,79 @@ class QdrantClientWrapper:
             if "not found" not in str(e).lower():
                 raise
 
+    def delete_embeddings_by_filter(self, session_id: int, filter_conditions: Dict[str, Any]) -> None:
+        """특정 조건에 맞는 임베딩들을 삭제합니다."""
+        collection_name = f"session_{session_id}"
+        try:
+            self.client.delete(
+                collection_name=collection_name,
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key=key,
+                                match=models.MatchValue(value=value)
+                            )
+                            for key, value in filter_conditions.items()
+                        ]
+                    )
+                )
+            )
+        except Exception as e:
+            print(f"Error deleting embeddings by filter: {e}")
+
+    def delete_embeddings_by_similarity(self, session_id: int, query: str, similarity_threshold: float) -> None:
+        """특정 쿼리와의 유사도가 임계값 이하인 임베딩들을 삭제합니다."""
+        collection_name = f"session_{session_id}"
+        try:
+            query_embedding = self.get_embedding(query)
+            search_result = self.client.search(
+                collection_name=collection_name,
+                query_vector=query_embedding,
+                limit=100  # 충분히 큰 수로 설정
+            )
+            
+            # 임계값 이하의 점수를 가진 포인트 ID 수집
+            points_to_delete = [
+                result.id for result in search_result
+                if result.score < similarity_threshold
+            ]
+            
+            if points_to_delete:
+                self.client.delete(
+                    collection_name=collection_name,
+                    points_selector=models.PointIdsList(
+                        points=points_to_delete
+                    )
+                )
+        except Exception as e:
+            print(f"Error deleting embeddings by similarity: {e}")
+
+    def cleanup_old_embeddings(self, session_id: int, days_threshold: int = 30) -> None:
+        """특정 일수 이상 지난 임베딩들을 삭제합니다."""
+        collection_name = f"session_{session_id}"
+        try:
+            from datetime import datetime, timedelta
+            threshold_date = datetime.utcnow() - timedelta(days=days_threshold)
+            
+            self.client.delete(
+                collection_name=collection_name,
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="created_at",
+                                range=models.Range(
+                                    lt=threshold_date.isoformat()
+                                )
+                            )
+                        ]
+                    )
+                )
+            )
+        except Exception as e:
+            print(f"Error cleaning up old embeddings: {e}")
+
     def search_similar(
         self,
         query: str,

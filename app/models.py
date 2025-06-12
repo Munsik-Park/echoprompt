@@ -26,6 +26,9 @@ class Message(MessageBase, table=True):
 class SessionCreate(SessionBase):
     pass
 
+class SessionUpdate(SessionBase):
+    name: Optional[str] = Field(None, description="업데이트할 세션 이름")
+
 class SessionResponse(SessionBase):
     id: int
     created_at: datetime
@@ -33,6 +36,10 @@ class SessionResponse(SessionBase):
 
 class MessageCreate(MessageBase):
     pass
+
+class MessageUpdate(MessageBase):
+    content: Optional[str] = Field(None, description="업데이트할 메시지 내용")
+    role: Optional[str] = Field(None, description="업데이트할 메시지 역할")
 
 class MessageResponse(MessageBase):
     id: int
@@ -47,4 +54,15 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     messages: List[MessageResponse]
-    similarity_scores: List[float] 
+    similarity_scores: List[float]
+
+class SemanticSearchRequest(BaseModel):
+    query: str = Field(..., description="의미론적 검색 쿼리")
+    session_id: int = Field(..., description="세션 ID")
+    top_k: int = Field(default=5, description="반환할 결과 수")
+    similarity_threshold: float = Field(default=0.7, description="유사도 임계값")
+
+class SemanticSearchResponse(BaseModel):
+    messages: List[MessageResponse]
+    similarity_scores: List[float]
+    total_matches: int 
