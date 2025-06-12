@@ -91,9 +91,14 @@ while lsof -i :${API_PORT} > /dev/null; do
 done
 echo "Previous server process terminated."
 
+# 기존 로그 파일이 있으면 타임스탬프를 붙여 백업
+if [ -f nohup.out ]; then
+    mv nohup.out nohup.out.$(date +%Y%m%d_%H%M%S)
+fi
+
 # FastAPI 서버 시작
 echo "Starting FastAPI server..."
-nohup uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT} > nohup.out 2>&1 &
+nohup uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT} --reload > nohup.out 2>&1 &
 
 # 서버 시작 대기
 echo "Waiting for server to start..."

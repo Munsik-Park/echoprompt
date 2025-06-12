@@ -4,10 +4,12 @@ A FastAPI-based application for managing chat sessions with semantic search capa
 
 ## Features
 
-- Session management (create, read)
-- Message management within sessions
+- Session management (create, read, update, delete)
+- Message management within sessions (create, read, update, delete)
 - Semantic search using Qdrant vector database
 - OpenAI embeddings integration
+- Advanced vector search with similarity thresholds
+- Automatic embedding cleanup and management
 
 ## Prerequisites
 
@@ -145,6 +147,21 @@ bash test_api.sh
 
 ### Query
 - `POST /query/semantic_search` - Search messages semantically within a session
+  - Parameters:
+    - `query`: Search query text
+    - `session_id`: Target session ID
+    - `top_k`: Number of results to return (default: 5)
+    - `similarity_threshold`: Minimum similarity score (default: 0.7)
+  - Returns:
+    - List of matching messages with similarity scores
+    - Total number of matches
+    - Search metadata
+
+### Vector Management
+- Automatic embedding cleanup for old messages
+- Similarity-based filtering
+- Session-specific vector collections
+- Efficient vector search with configurable thresholds
 
 ## Qdrant-based Semantic Search Structure
 

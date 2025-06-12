@@ -4,10 +4,18 @@ from app.routers import session_router, query_router, chat_router
 from app.database import create_db_and_tables
 from app.config import settings
 import os
+import logging
 
 # 필수 환경 변수 확인
 if not os.getenv('VITE_FRONTEND_PORT'):
     raise ValueError("VITE_FRONTEND_PORT environment variable is not set")
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 app = FastAPI(
     title="EchoPrompt API",
