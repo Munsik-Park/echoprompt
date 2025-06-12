@@ -9,6 +9,7 @@ from .query import (
 )
 from .chat import ChatRequest, ChatResponse
 from .error import ErrorResponse, ErrorCode
+from .vector_payload import VectorPayload
 
 __all__ = [
     'SessionModel',
@@ -28,6 +29,7 @@ __all__ = [
     'ChatRequest',
     'ChatResponse',
     'ErrorResponse',
-    'ErrorCode'
+    'ErrorCode',
+    'VectorPayload'
 ]
  

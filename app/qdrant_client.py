@@ -1,5 +1,7 @@
 import os
 from typing import List, Tuple, Optional, Dict, Any
+from datetime import datetime
+from app.models import VectorPayload
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from dotenv import load_dotenv
@@ -247,4 +249,43 @@ class QdrantClientFactory:
 # FastAPI 의존성으로 제공
 def get_qdrant_client() -> QdrantClientWrapper:
     """FastAPI 의존성 주입을 위한 Qdrant 클라이언트 생성 함수"""
-    return QdrantClientFactory.create_client() 
+    return QdrantClientFactory.create_client()
+
+
+def insert_vector(
+    client: QdrantClient,
+    collection_name: str,
+    vector: List[float],
+    payload: VectorPayload,
+    vector_id: Optional[int] = None,
+) -> int:
+    """Insert a vector with payload into the specified collection."""
+    if vector_id is None:
+        vector_id = int(datetime.utcnow().timestamp() * 1000)
+
+    client.upsert(
+        collection_name=collection_name,
+        points=[
+            models.PointStruct(id=vector_id, vector=vector, payload=payload.dict())
+        ],
+    )
+    return vector_id
+
+
+def search_vectors(
+    client: QdrantClient,
+    collection_name: str,
+    query_vector: List[float],
+    limit: int = 5,
+    query_filter: Optional[models.Filter] = None,
+) -> List[Dict[str, Any]]:
+    """Search for similar vectors in a collection."""
+    results = client.search(
+        collection_name=collection_name,
+        query_vector=query_vector,
+        query_filter=query_filter,
+        limit=limit,
+    )
+    return [
+        {"id": r.id, "score": r.score, "payload": r.payload} for r in results
+    ]
