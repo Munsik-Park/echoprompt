@@ -59,7 +59,26 @@ else
     exit 1
 fi
 
-echo "=== 1. 세션 생성 ==="
+echo -e "\n=== 1. API 루트 확인 ==="
+ROOT_RESPONSE=$(curl -s -X GET "$BASE_URL")
+if echo "$ROOT_RESPONSE" | jq -e 'has("message")' > /dev/null; then
+    echo "✅ API 루트 응답 성공"
+else
+    echo "[ERROR] API 루트 응답 오류: $ROOT_RESPONSE"
+    exit 1
+fi
+
+echo -e "\n=== 2. 서버 헬스 체크 ==="
+HEALTH_RESPONSE=$(curl -s -X GET "$API_URL/health")
+# 서버 헬스 체크 응답 구조 변경 대응
+if echo "$HEALTH_RESPONSE" | jq -e '.status == "healthy"' > /dev/null; then
+    echo "✅ 서버 헬스 체크 성공"
+else
+    echo "[ERROR] 서버 헬스 체크 실패: $HEALTH_RESPONSE"
+    exit 1
+fi
+
+echo "=== 3. 세션 생성 ==="
 SESSION_ID=$(curl -s -X POST "$API_URL/sessions" -H "Content-Type: application/json" -d '{"name": "테스트 세션"}' | jq .id)
 echo "[TEST] Created session: $SESSION_ID"
 if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "null" ]; then
@@ -67,22 +86,78 @@ if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "null" ]; then
   exit 1
 fi
 
-echo -e "\n=== 2. 세션에 메시지 추가 ==="
+echo -e "\n=== 4. 전체 세션 목록 조회 ==="
+SESSIONS=$(curl -s -X GET "$API_URL/sessions")
+if echo "$SESSIONS" | jq -e 'type=="array"' > /dev/null; then
+    echo "✅ 세션 목록 조회 성공"
+else
+    echo "[ERROR] 세션 목록 응답 오류: $SESSIONS"
+    exit 1
+fi
+
+echo -e "\n=== 5. 단일 세션 조회 ==="
+SESSION_RESPONSE=$(curl -s -X GET "$API_URL/sessions/$SESSION_ID")
+if echo "$SESSION_RESPONSE" | jq -e ".id == $SESSION_ID" > /dev/null; then
+    echo "✅ 단일 세션 조회 성공"
+else
+    echo "[ERROR] 단일 세션 조회 실패: $SESSION_RESPONSE"
+    exit 1
+fi
+
+echo -e "\n=== 6. 세션에 메시지 추가 ==="
 MESSAGE_RES=$(curl -s -X POST "$API_URL/sessions/$SESSION_ID/messages" \
   -H "Content-Type: application/json; charset=utf-8" \
   -d '{"content": "테스트 메시지", "role": "user"}')
 echo "[TEST] Message add response: $MESSAGE_RES"
-MESSAGE_ID=$(echo $MESSAGE_RES | jq .id)
+MESSAGE_ID=$(echo $MESSAGE_RES | jq '.message.id')
 if [ -z "$MESSAGE_ID" ] || [ "$MESSAGE_ID" = "null" ]; then
   echo "[ERROR] 메시지 추가 실패"
   exit 1
 fi
 
-echo -e "\n=== 3. 세션 메시지 조회 ==="
+echo -e "\n=== 7. 세션 메시지 조회 ==="
 MESSAGES_RESPONSE=$(curl -s -X GET "$API_URL/sessions/$SESSION_ID/messages")
-echo "응답: $MESSAGES_RESPONSE"
+if echo "$MESSAGES_RESPONSE" | jq -e 'type=="array"' > /dev/null; then
+    echo "✅ 세션 메시지 조회 성공"
+else
+    echo "[ERROR] 세션 메시지 조회 실패: $MESSAGES_RESPONSE"
+    exit 1
+fi
 
-echo -e "\n=== 4. 의미 기반 검색 ==="
+echo -e "\n=== 8. 일반 쿼리 처리 ==="
+QUERY_RESPONSE=$(curl -s -X POST "$API_URL/query/query" \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"테스트\", \"session_id\": $SESSION_ID, \"limit\": 5}")
+if echo "$QUERY_RESPONSE" | jq -e 'has("messages")' > /dev/null; then
+    echo "✅ 일반 쿼리 처리 성공"
+else
+    echo "[ERROR] 일반 쿼리 처리 실패: $QUERY_RESPONSE"
+    exit 1
+fi
+
+echo -e "\n=== 9. LLM 응답 기반 대화 ==="
+CHAT_RESPONSE=$(curl -s -X POST "$API_URL/chat" \
+  -H "Content-Type: application/json" \
+  -d "{\"messages\": [{\"role\": \"user\", \"content\": \"테스트 메시지\"}]}")
+if echo "$CHAT_RESPONSE" | jq -e 'has("response")' > /dev/null; then
+    echo "✅ LLM 응답 기반 대화 성공"
+else
+    echo "[ERROR] LLM 응답 기반 대화 실패: $CHAT_RESPONSE"
+    exit 1
+fi
+
+echo -e "\n=== 10. 단일 메시지 기반 대화 ==="
+SINGLE_CHAT_RESPONSE=$(curl -s -X POST "$API_URL/chat/message" \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"테스트 메시지\"}")
+if echo "$SINGLE_CHAT_RESPONSE" | jq -e 'has("message")' > /dev/null; then
+    echo "✅ 단일 메시지 기반 대화 성공"
+else
+    echo "[ERROR] 단일 메시지 기반 대화 실패: $SINGLE_CHAT_RESPONSE"
+    exit 1
+fi
+
+echo -e "\n=== 11. 의미 기반 검색 ==="
 SEARCH_RES=$(curl -s -X POST "$API_URL/query/semantic_search" -H "Content-Type: application/json" -d "{\"query\": \"테스트\", \"session_id\": $SESSION_ID, \"limit\": 5}")
 echo "[TEST] Semantic search response: $SEARCH_RES"
 SEARCH_COUNT=$(echo $SEARCH_RES | jq '.results | length')
@@ -91,25 +166,45 @@ if [ "$SEARCH_COUNT" -eq 0 ]; then
   exit 1
 fi
 
-echo -e "\n=== 5. 세션 정보 업데이트 ==="
+echo -e "\n=== 12. 세션 정보 업데이트 ==="
 UPDATE_SESSION_RESPONSE=$(curl -s -X PUT "$API_URL/sessions/$SESSION_ID" \
   -H "Content-Type: application/json" \
   -d '{"name": "업데이트된 테스트 세션"}')
-echo "응답: $UPDATE_SESSION_RESPONSE"
+if echo "$UPDATE_SESSION_RESPONSE" | jq -e ".name == \"업데이트된 테스트 세션\"" > /dev/null; then
+    echo "✅ 세션 정보 업데이트 성공"
+else
+    echo "[ERROR] 세션 정보 업데이트 실패: $UPDATE_SESSION_RESPONSE"
+    exit 1
+fi
 
-echo -e "\n=== 6. 메시지 업데이트 ==="
+echo -e "\n=== 13. 메시지 업데이트 ==="
 UPDATE_MESSAGE_RESPONSE=$(curl -s -X PUT "$API_URL/sessions/$SESSION_ID/messages/$MESSAGE_ID" \
   -H "Content-Type: application/json" \
   -d '{"content": "업데이트된 메시지입니다!", "role": "user"}')
-echo "응답: $UPDATE_MESSAGE_RESPONSE"
+if echo "$UPDATE_MESSAGE_RESPONSE" | jq -e ".content == \"업데이트된 메시지입니다!\"" > /dev/null; then
+    echo "✅ 메시지 업데이트 성공"
+else
+    echo "[ERROR] 메시지 업데이트 실패: $UPDATE_MESSAGE_RESPONSE"
+    exit 1
+fi
 
-echo -e "\n=== 7. 메시지 삭제 ==="
+echo -e "\n=== 14. 메시지 삭제 ==="
 DELETE_MESSAGE_RESPONSE=$(curl -s -X DELETE "$API_URL/sessions/$SESSION_ID/messages/$MESSAGE_ID")
-echo "응답 상태 코드: $?"
+if [ $? -eq 0 ]; then
+    echo "✅ 메시지 삭제 성공"
+else
+    echo "[ERROR] 메시지 삭제 실패"
+    exit 1
+fi
 
-echo -e "\n=== 8. 세션 삭제 ==="
+echo -e "\n=== 15. 세션 삭제 ==="
 DELETE_SESSION_RESPONSE=$(curl -s -X DELETE "$API_URL/sessions/$SESSION_ID")
-echo "응답 상태 코드: $?"
+if [ $? -eq 0 ]; then
+    echo "✅ 세션 삭제 성공"
+else
+    echo "[ERROR] 세션 삭제 실패"
+    exit 1
+fi
 
 # OpenAPI Spec 정리
 rm -f "$API_DOCS_DIR/openapi.json"

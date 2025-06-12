@@ -19,6 +19,7 @@ from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.config import settings
 from datetime import datetime
 from app.openai_client import get_openai_client
+import openai
 
 router = APIRouter(
     prefix=f"{settings.API_PREFIX}/sessions",
@@ -129,7 +130,7 @@ def create_message_endpoint(
     session_id: int = Path(..., description="Session ID"),
     message: MessageCreate = Body(..., description="Message payload"),
     qdrant_client: QdrantClientWrapper = Depends(get_qdrant_client),
-    openai_client = Depends(get_openai_client)
+    openai_client: openai.OpenAI = Depends(get_openai_client)
 ):
     """Create a message and store its embedding. Also generate LLM response."""
     session_obj = db.query(SessionModel).filter(SessionModel.id == session_id).first()
