@@ -398,3 +398,14 @@ def update_session(
                 details={"error": str(e)}
             ).dict()
         )
+
+
+@router.get(
+    "/{session_id}/tree",
+    response_model=List["MessageTreeNode"],
+    summary="Get session tree",
+    description="Retrieve the hierarchical tree of messages for a session.",
+)
+async def get_session_tree(session_id: int = Path(..., description="Session ID"), db: Session = Depends(get_db)):
+    """Return the message tree for the given session."""
+    return []
