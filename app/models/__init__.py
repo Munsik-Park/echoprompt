@@ -10,6 +10,7 @@ from .query import (
 from .chat import ChatRequest, ChatResponse
 from .error import ErrorResponse, ErrorCode
 from .vector_payload import VectorPayload
+from .message_tree import MessageTreeNode
 
 __all__ = [
     'SessionModel',
@@ -30,6 +31,7 @@ __all__ = [
     'ChatResponse',
     'ErrorResponse',
     'ErrorCode',
-    'VectorPayload'
+    'VectorPayload',
+    'MessageTreeNode'
 ]
  
