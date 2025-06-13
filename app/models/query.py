@@ -19,6 +19,16 @@ class SemanticSearchRequest(BaseModel):
     session_id: int = Field(..., description="Target session ID", example=1)
     query: str = Field(..., description="Query text", example="Hello")
     limit: int = Field(5, description="Number of results to return", example=5)
+    user_id: Optional[str] = Field(
+        None,
+        description="Filter results by user ID",
+        example="user_123",
+    )
+    memory_type: Optional[str] = Field(
+        None,
+        description="Memory type to search (short_term, summary, long_term)",
+        example="short_term",
+    )
 
     class Config:
         from_attributes = True

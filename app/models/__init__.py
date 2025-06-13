@@ -9,6 +9,7 @@ from .query import (
 )
 from .chat import ChatRequest, ChatResponse
 from .error import ErrorResponse, ErrorCode
+from .message_tree import MessageTreeNode
 
 __all__ = [
     'SessionModel',
@@ -28,6 +29,6 @@ __all__ = [
     'ChatRequest',
     'ChatResponse',
     'ErrorResponse',
-    'ErrorCode'
+    'ErrorCode',
+    'MessageTreeNode',
 ]
- 

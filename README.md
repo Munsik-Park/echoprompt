@@ -142,9 +142,17 @@ bash test_api.sh
 - `GET /sessions/{session_id}/messages/` - Get all messages in a session
 - `PUT /sessions/{session_id}/messages/{message_id}` - Update a message
 - `DELETE /sessions/{session_id}/messages/{message_id}` - Delete a message
+- `GET /sessions/{session_id}/tree` - Retrieve messages in a tree structure
 
 ### Query
 - `POST /query/semantic_search` - Search messages semantically within a session
+
+### Collections
+- `GET /collections` - List vector collections
+- `GET /collections/{name}/users` - List users within a collection
+
+### Users
+- `GET /users/{id}/sessions` - List sessions for a user
 
 ## Qdrant-based Semantic Search Structure
 
