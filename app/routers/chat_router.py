@@ -9,7 +9,9 @@ from app.models import (
     ChatRequest,
     ChatResponse,
     ErrorResponse,
-    ErrorCode
+    ErrorCode,
+    UserModel, # Added for fetching user_identifier
+    RetrievedChunk # Import for response
 )
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.openai_client import get_openai_client
@@ -44,7 +46,8 @@ async def chat(
         user_message = MessageModel(
             session_id=request.session_id,
             content=request.prompt,
-            role="user"
+            role="user",
+            document_id=request.document_id # Save document_id
         )
         db.add(user_message)
         db.commit()
@@ -52,22 +55,42 @@ async def chat(
 
         # 임베딩 생성 및 저장
         embedding = qdrant_client.get_embedding(request.prompt)
+
+        # Fetch user_identifier for Qdrant
+        user_identifier_for_qdrant = None
+        # session is already fetched: session = db.query(SessionModel).filter(SessionModel.id == request.session_id).first()
+        if session and session.user_id:
+            db_user = db.query(UserModel).filter(UserModel.id == session.user_id).first()
+            if db_user:
+                user_identifier_for_qdrant = db_user.user_identifier
+
         qdrant_client.store_embedding(
             message_id=user_message.id,
-            session_id=request.session_id,
+            session_id=request.session_id, # This is session.id
             content=request.prompt,
-            embedding=embedding
+            embedding=embedding,
+            document_id=user_message.document_id, # Ensure user_message has this from request.document_id
+            user_identifier=user_identifier_for_qdrant,
+            memory_type=request.memory_type or "short_term" # Pass memory_type
         )
 
-        # 유사한 메시지 검색
-        similar_messages = qdrant_client.search_similar(
+        # 유사한 메시지 검색 (using multi-stage search)
+        similar_messages = qdrant_client.multi_stage_search(
             query=request.prompt,
-            session_id=request.session_id,
-            limit=5
+            session_id=request.session_id, # DB session.id
+            user_identifier=user_identifier_for_qdrant, # Pass user_identifier
+            limit_per_stage=3 # Hardcoded limit_per_stage for chat context
+            # short_term_days_cutoff can be configured globally or passed if added to ChatRequest
         )
 
         # 컨텍스트 구성
-        context = "\n".join([msg["content"] for msg in similar_messages])
+        # The payload structure from multi_stage_search is List[Dict{"id": ..., "score": ..., "payload": ...}]
+        # Access content via msg["payload"]["content"]
+        context_parts = []
+        for msg in similar_messages:
+            if msg and "payload" in msg and isinstance(msg["payload"], dict) and "content" in msg["payload"]:
+                context_parts.append(str(msg["payload"]["content"]))
+        context = "\n".join(context_parts)
 
         # OpenAI API 호출
         response = openai_client.chat.completions.create(
@@ -82,15 +105,35 @@ async def chat(
         assistant_message = MessageModel(
             session_id=request.session_id,
             content=response.choices[0].message.content,
-            role="assistant"
+            role="assistant",
+            document_id=request.document_id # Save document_id for assistant message too?
+                                            # Or should assistant messages have null document_id?
+                                            # For now, let's assume it inherits from the user prompt context.
         )
         db.add(assistant_message)
         db.commit()
         db.refresh(assistant_message)
 
+        retrieved_chunks_for_response: Optional[List[RetrievedChunk]] = None
+        if similar_messages: # similar_messages is the result from multi_stage_search
+            retrieved_chunks_for_response = []
+            for chunk_data in similar_messages:
+                payload = chunk_data.get("payload") if chunk_data.get("payload") is not None else {}
+                retrieved_chunks_for_response.append(
+                    RetrievedChunk(
+                        id=chunk_data.get("id", "N/A"), # Ensure ID is present or default
+                        content=str(payload.get("content")) if payload.get("content") is not None else None,
+                        score=float(chunk_data.get("score", 0.0)), # Ensure score is float
+                        document_id=str(payload.get("document_id")) if payload.get("document_id") is not None else None,
+                        memory_type=str(payload.get("memory_type")) if payload.get("memory_type") is not None else None,
+                        payload=payload
+                    )
+                )
+
         return ChatResponse(
             message=assistant_message.content,
-            similar_messages=[msg["content"] for msg in similar_messages]
+            retrieved_chunks=retrieved_chunks_for_response
+            # old similar_messages field is removed by this change
         )
 
     except Exception as e:

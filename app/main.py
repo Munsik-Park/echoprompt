@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import session_router, query_router, chat_router
+from app.routers import session_router, query_router, chat_router, user_router, collection_router # Added new routers
 from app.database import create_db_and_tables
+# Ensure all models are imported so SQLModel.metadata knows about them
+from app.models import UserModel, CollectionModel, CollectionUserLinkModel # Added to ensure tables are created
 from app.config import settings
 import os
 import logging
@@ -40,6 +42,8 @@ app.add_middleware(
 app.include_router(session_router.router)
 app.include_router(query_router.router)
 app.include_router(chat_router.router)
+app.include_router(user_router.router) # Added new router
+app.include_router(collection_router.router) # Added new router
 
 @app.on_event("startup")
 async def startup_event():

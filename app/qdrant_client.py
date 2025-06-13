@@ -84,7 +84,10 @@ class QdrantClientWrapper:
         message_id: int,
         session_id: int,
         content: str,
-        embedding: List[float]
+        embedding: List[float],
+        document_id: Optional[str] = None,
+        user_identifier: Optional[str] = None, # For user_id in Qdrant
+        memory_type: Literal["short_term", "long_term", "summary"] = "short_term" # Changed to Literal
     ) -> None:
         self._ensure_collection(session_id)
         collection_name = f"session_{session_id}"
@@ -98,7 +101,10 @@ class QdrantClientWrapper:
                     payload={
                         "content": content,
                         "message_id": message_id,
-                        "session_id": session_id
+                        "session_id": session_id, # This is the DB session.id (integer)
+                        "document_id": document_id,
+                        "user_id": user_identifier, # This is the user_identifier (string)
+                        "memory_type": memory_type # New field in payload
                     }
                 )
             ]
@@ -204,20 +210,28 @@ class QdrantClientWrapper:
     def search_similar(
         self,
         query: str,
-        session_id: int,
-        limit: Optional[int] = 5
+        session_id: int, # This is the DB session.id (integer)
+        limit: Optional[int] = 5,
+        user_identifier: Optional[str] = None # New parameter for filtering
     ) -> List[Dict[str, Any]]:
-        self._ensure_collection(session_id)
+        self._ensure_collection(session_id) # Collection name is based on DB session.id
         collection_name = f"session_{session_id}"
         
         query_embedding = self.get_embedding(query)
-        
-        # limit이 None이면 기본값 5 사용
         search_limit = limit if limit is not None else 5
+
+        query_filter = None
+        if user_identifier:
+            query_filter = models.Filter(
+                must=[
+                    models.FieldCondition(key='user_id', match=models.MatchValue(value=user_identifier))
+                ]
+            )
         
         search_result = self.client.search(
             collection_name=collection_name,
             query_vector=query_embedding,
+            query_filter=query_filter, # Pass the filter
             limit=search_limit
         )
         
@@ -236,6 +250,86 @@ class QdrantClientWrapper:
             print(f"Collection {collection_name} deleted successfully")
         except Exception as e:
             print(f"Error deleting collection: {e}")
+
+    def multi_stage_search(
+        self,
+        query: str,
+        session_id: int,
+        user_identifier: Optional[str] = None,
+        limit_per_stage: int = 3,
+        short_term_days_cutoff: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        self._ensure_collection(session_id)
+        collection_name = f"session_{session_id}"
+        query_embedding = self.get_embedding(query)
+
+        base_filters = []
+        if user_identifier:
+            base_filters.append(models.FieldCondition(key='user_id', match=models.MatchValue(value=user_identifier)))
+
+        all_results_map = {} # Using dict to store results by ID to handle potential duplicates by score
+
+        # Stage 1: Short-term Search
+        short_term_filters = list(base_filters)
+        short_term_filters.append(models.FieldCondition(key='memory_type', match=models.MatchValue(value='short_term')))
+
+        # timestamp field in VectorPayload needs to be used for date filtering.
+        # Assuming 'timestamp' is stored as a datetime string or Unix timestamp compatible with Qdrant's range filters.
+        # Qdrant expects ISO 8601 datetime strings for range filters on datetime fields if not using Unix timestamps.
+        # Let's assume VectorPayload.timestamp is a datetime object, and we store its ISO format or Qdrant handles it.
+        # For filtering, we need to ensure the payload's 'timestamp' field is correctly queryable.
+        # The current VectorPayload model has `timestamp: datetime`. When this is converted to JSON for Qdrant,
+        # it typically becomes an ISO string.
+        if short_term_days_cutoff is not None:
+            from datetime import datetime, timedelta
+            cutoff_date = datetime.utcnow() - timedelta(days=short_term_days_cutoff)
+            # Assuming timestamp is stored in a way Qdrant can filter by range (e.g., ISO string or Unix timestamp)
+            # If stored as ISO string:
+            short_term_filters.append(models.FieldCondition(key='timestamp', range=models.Range(gte=cutoff_date.isoformat())))
+            # If stored as Unix timestamp:
+            # short_term_filters.append(models.FieldCondition(key='timestamp', range=models.Range(gte=int(cutoff_date.timestamp()))))
+            # For now, assuming ISO format is implicitly handled by Qdrant/SQLModel during serialization to JSON.
+
+        st_results = self.client.search(
+            collection_name=collection_name,
+            query_vector=query_embedding,
+            query_filter=models.Filter(must=short_term_filters) if short_term_filters else None,
+            limit=limit_per_stage
+        )
+        for res in st_results:
+            if res.id not in all_results_map or res.score > all_results_map[res.id].score:
+                 all_results_map[res.id] = res
+
+        # Stage 2: Summary Type Search
+        summary_filters_list = list(base_filters)
+        summary_filters_list.append(models.FieldCondition(key='memory_type', match=models.MatchValue(value='summary')))
+        sum_results = self.client.search(
+            collection_name=collection_name,
+            query_vector=query_embedding,
+            query_filter=models.Filter(must=summary_filters_list) if summary_filters_list else None,
+            limit=limit_per_stage
+        )
+        for res in sum_results:
+            if res.id not in all_results_map or res.score > all_results_map[res.id].score:
+                 all_results_map[res.id] = res
+
+        # Stage 3: Long-term Search
+        long_term_filters = list(base_filters)
+        long_term_filters.append(models.FieldCondition(key='memory_type', match=models.MatchValue(value='long_term')))
+        lt_results = self.client.search(
+            collection_name=collection_name,
+            query_vector=query_embedding,
+            query_filter=models.Filter(must=long_term_filters) if long_term_filters else None,
+            limit=limit_per_stage
+        )
+        for res in lt_results:
+            if res.id not in all_results_map or res.score > all_results_map[res.id].score:
+                 all_results_map[res.id] = res
+
+        # Convert map to list and sort by score
+        combined_results_list = sorted(all_results_map.values(), key=lambda r: r.score, reverse=True)
+
+        return [{"id": res.id, "score": res.score, "payload": res.payload} for res in combined_results_list]
 
 class QdrantClientFactory:
     @staticmethod

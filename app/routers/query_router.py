@@ -77,12 +77,15 @@ async def semantic_search(
 
         # Qdrant에서 검색
         try:
-            search_results = qdrant_client.search_similar(
+            # Use multi_stage_search instead of search_similar
+            search_results = qdrant_client.multi_stage_search(
                 query=request.query,
-                session_id=request.session_id,
-                limit=request.limit
+                session_id=request.session_id, # DB session.id
+                user_identifier=request.user_identifier, # Pass user_identifier
+                limit_per_stage=request.limit # Use request.limit as limit_per_stage
+                # short_term_days_cutoff can be added to SemanticSearchRequest if needed
             )
-            print(f"검색 결과: {search_results}")
+            print(f"Multi-stage 검색 결과: {search_results}")
         except Exception as e:
             print(f"Qdrant 검색 에러: {str(e)}")
             raise HTTPException(
@@ -133,13 +136,15 @@ async def semantic_search(
         min_score = min(scores) if scores else None
         max_score = max(scores) if scores else None
 
-        # 전체 검색 결과 수 계산 (limit 제한 없이)
-        total_results = qdrant_client.search_similar(
-            query=request.query,
-            session_id=request.session_id,
-            limit=None
-        )
-        total_count = len(total_results)
+        # 전체 검색 결과 수 계산 (limit 제한 없이) - This part might be less relevant with multi-stage
+        # as 'total' usually means total matchable before limit. Multi-stage complicates this.
+        # For now, let's define total as the count of de-duplicated results from multi_stage_search without a final limit.
+        # Or, we can sum limits if that's meaningful.
+        # Let's simplify: total returned by the current multi_stage_search call.
+        # The multi_stage_search already returns a combined list.
+        # If we want a "true total available", that's a more complex query.
+        # For now, total = len(search_results) after multi-stage combination and de-duplication.
+        total_count = len(search_results)
 
         response = SemanticSearchResponse(
             results=results,
@@ -189,10 +194,12 @@ def query(
         
         # 유사한 메시지 검색
         try:
-            similar_messages = qdrant_client.search_similar(
+            # Use multi_stage_search instead of search_similar
+            similar_messages = qdrant_client.multi_stage_search(
                 query=request.query,
-                session_id=request.session_id,
-                limit=request.limit
+                session_id=request.session_id, # DB session.id
+                user_identifier=request.user_identifier, # Pass user_identifier
+                limit_per_stage=request.limit # Use request.limit as limit_per_stage
             )
         except Exception as e:
             raise HTTPException(

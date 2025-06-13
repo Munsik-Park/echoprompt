@@ -3,8 +3,9 @@ from pydantic import BaseModel, Field
 
 class QueryRequest(BaseModel):
     query: str
-    session_id: int
+    session_id: int # This is the DB session.id (integer)
     limit: int = 5
+    user_identifier: Optional[str] = None # New field for Qdrant user_id filtering
 
 class QueryResponse(BaseModel):
     results: List[Dict[str, Any]]
@@ -19,6 +20,7 @@ class SemanticSearchRequest(BaseModel):
     session_id: int = Field(..., description="Target session ID", example=1)
     query: str = Field(..., description="Query text", example="Hello")
     limit: int = Field(5, description="Number of results to return", example=5)
+    user_identifier: Optional[str] = Field(None, description="User identifier for Qdrant filtering") # New field
 
     class Config:
         from_attributes = True

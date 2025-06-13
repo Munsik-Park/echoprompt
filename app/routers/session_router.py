@@ -12,8 +12,13 @@ from app.models import (
     MessageUpdate,
     MessageResponse,
     MessagePairResponse,
+    MessageTreeNode,
+    DocumentMessageGroup,
+    SessionDocumentTreeResponse,
     ErrorResponse,
-    ErrorCode
+    ErrorCode,
+    UserModel # Added for fetching user_identifier
+    # SessionModel is already imported
 )
 from app.qdrant_client import get_qdrant_client, QdrantClientWrapper
 from app.config import settings
@@ -39,6 +44,66 @@ async def get_sessions(db: Session = Depends(get_db)):
                 details={"error": str(e)}
             ).dict()
         )
+
+from collections import defaultdict
+
+@router.get(
+    "/{session_id}/tree",
+    response_model=SessionDocumentTreeResponse, # Changed response model
+    summary="Get message tree for a session, grouped by document_id",
+    description="Retrieve all messages for a session, grouped by document_id and sorted by creation date within each group.",
+)
+async def get_message_tree(
+    session_id: int = Path(..., description="Session ID"),
+    db: Session = Depends(get_db),
+):
+    # Check if session exists
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ErrorResponse(
+                error=ErrorCode.SESSION_NOT_FOUND,
+                message=f"Session with ID {session_id} not found"
+            ).dict()
+        )
+
+    # Fetch messages from the database for the session
+    db_messages = db.query(MessageModel).filter(MessageModel.session_id == session_id).order_by(MessageModel.document_id, MessageModel.created_at).all()
+
+    # Group messages by document_id
+    message_groups = defaultdict(list)
+    for msg in db_messages:
+        doc_id = msg.document_id if msg.document_id is not None else "unknown_document"
+        message_groups[doc_id].append(msg)
+
+    # Convert grouped messages to response model structure
+    document_message_groups = []
+    for doc_id, messages_in_group in message_groups.items():
+        # Messages are already sorted by created_at due to the ORDER BY clause,
+        # but if we didn't sort by document_id initially, we would sort here.
+        # For clarity, we can re-sort if needed, or rely on the DB sort.
+        # messages_in_group.sort(key=lambda m: m.created_at) # Already sorted by DB
+
+        tree_nodes = []
+        for msg_model in messages_in_group:
+            tree_nodes.append(MessageTreeNode(
+                id=msg_model.id,
+                session_id=msg_model.session_id,
+                # document_id=msg_model.document_id, # MessageTreeNode does not have document_id, it's one level up
+                content=msg_model.content,
+                role=msg_model.role,
+                created_at=msg_model.created_at,
+                updated_at=msg_model.updated_at,
+                children=[] # Still flat within the document group
+            ))
+
+        document_message_groups.append(DocumentMessageGroup(
+            document_id=doc_id,
+            messages=tree_nodes
+        ))
+
+    return SessionDocumentTreeResponse(__root__=document_message_groups)
 
 @router.post("", response_model=SessionModel)
 async def create_session(session: SessionCreate, db: Session = Depends(get_db)):
@@ -139,7 +204,12 @@ def create_message_endpoint(
     
     try:
         # 사용자 메시지 생성
-        new_message = MessageModel(session_id=session_id, content=message.content, role=message.role)
+        new_message = MessageModel(
+            session_id=session_id,
+            content=message.content,
+            role=message.role,
+            document_id=message.document_id # Save document_id
+        )
         db.add(new_message)
         db.commit()
         db.refresh(new_message)
@@ -154,11 +224,23 @@ def create_message_endpoint(
                 print(f"[DEBUG] 임베딩 생성 시작")
                 embedding = qdrant_client.get_embedding(message.content)
                 qdrant_client._ensure_collection(session_id)
+
+                # Fetch user_identifier for Qdrant before storing embedding
+                user_identifier_for_qdrant = None
+                db_session_for_user = db.query(SessionModel).filter(SessionModel.id == new_message.session_id).first()
+                if db_session_for_user and db_session_for_user.user_id:
+                    db_user = db.query(UserModel).filter(UserModel.id == db_session_for_user.user_id).first()
+                    if db_user:
+                        user_identifier_for_qdrant = db_user.user_identifier
+
                 qdrant_client.store_embedding(
                     message_id=new_message.id,
-                    session_id=session_id,
+                    session_id=new_message.session_id,
                     content=message.content,
-                    embedding=embedding
+                    embedding=embedding,
+                    document_id=new_message.document_id,
+                    user_identifier=user_identifier_for_qdrant,
+                    memory_type=message.memory_type or "short_term" # Pass memory_type
                 )
                 print(f"[DEBUG] 임베딩 저장 완료")
                 
@@ -343,6 +425,8 @@ def update_message(
         message_obj.content = message.content
     if message.role is not None:
         message_obj.role = message.role
+    if message.document_id is not None: # Save document_id
+        message_obj.document_id = message.document_id
 
     db.commit()
     db.refresh(message_obj)
@@ -350,11 +434,23 @@ def update_message(
     # 임베딩 재생성
     if message.content is not None and message_obj.role == "user":
         embedding = qdrant_client.get_embedding(message.content)
+
+        # Fetch user_identifier for Qdrant before storing embedding
+        user_identifier_for_qdrant = None
+        db_session_for_user = db.query(SessionModel).filter(SessionModel.id == message_obj.session_id).first()
+        if db_session_for_user and db_session_for_user.user_id:
+            db_user = db.query(UserModel).filter(UserModel.id == db_session_for_user.user_id).first()
+            if db_user:
+                user_identifier_for_qdrant = db_user.user_identifier
+
         qdrant_client.store_embedding(
             message_id=message_id,
-            session_id=session_id,
-            content=message.content,
-            embedding=embedding
+            session_id=message_obj.session_id,
+            content=message.content, # This is the new content from the request
+            embedding=embedding,
+            document_id=message_obj.document_id, # document_id is part of the message identity, not changed here
+            user_identifier=user_identifier_for_qdrant,
+            memory_type=message.memory_type if message.memory_type is not None else "short_term" # Pass memory_type
         )
 
     return message_obj
