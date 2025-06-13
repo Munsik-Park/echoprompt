@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any # Added List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -18,7 +18,9 @@ class MessageBase(SQLModel):
     )
 
 class MessageCreate(MessageBase):
-    pass
+    user_id: Optional[str] = None
+    document_id: Optional[str] = None
+    memory_type: Optional[str] = None
 
 class MessageUpdate(SQLModel):
     """Schema for updating an existing message."""
@@ -50,12 +52,16 @@ class MessagePairResponse(BaseModel):
 
     message: MessageResponse = Field(..., description="Assistant message")
     user_message: MessageResponse = Field(..., description="User message")
+    retrieved_chunks: Optional[List[Dict[str, Any]]] = None
 
 class MessageModel(MessageBase, table=True):
     """Database model for storing messages."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="sessionmodel.id")
+    user_id: Optional[str] = Field(default=None)
+    document_id: Optional[str] = Field(default=None)
+    memory_type: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
  

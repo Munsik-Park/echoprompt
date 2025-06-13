@@ -82,22 +82,33 @@ class QdrantClientWrapper:
         message_id: int,
         session_id: int,
         content: str,
-        embedding: List[float]
+        embedding: List[float],
+        user_id: Optional[str] = None,
+        document_id: Optional[str] = None,
+        memory_type: Optional[str] = None
     ) -> None:
         self._ensure_collection(session_id)
         collection_name = f"session_{session_id}"
         
+        payload = {
+            "content": content,
+            "message_id": message_id,
+            "session_id": session_id
+        }
+        if user_id:
+            payload["user_id"] = user_id
+        if document_id:
+            payload["document_id"] = document_id
+        if memory_type:
+            payload["memory_type"] = memory_type
+
         self.client.upsert(
             collection_name=collection_name,
             points=[
                 models.PointStruct(
                     id=message_id,
                     vector=embedding,
-                    payload={
-                        "content": content,
-                        "message_id": message_id,
-                        "session_id": session_id
-                    }
+                    payload=payload
                 )
             ]
         )
@@ -130,7 +141,10 @@ class QdrantClientWrapper:
         self,
         query: str,
         session_id: int,
-        limit: Optional[int] = 5
+        limit: Optional[int] = 5,
+        user_id: Optional[str] = None,
+        document_id: Optional[str] = None,
+        memory_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         self._ensure_collection(session_id)
         collection_name = f"session_{session_id}"
@@ -140,9 +154,20 @@ class QdrantClientWrapper:
         # limit이 None이면 기본값 5 사용
         search_limit = limit if limit is not None else 5
         
+        must_conditions = []
+        if user_id:
+            must_conditions.append(models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)))
+        if document_id:
+            must_conditions.append(models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id)))
+        if memory_type:
+            must_conditions.append(models.FieldCondition(key="memory_type", match=models.MatchValue(value=memory_type)))
+
+        query_filter = models.Filter(must=must_conditions) if must_conditions else None
+
         search_result = self.client.search(
             collection_name=collection_name,
             query_vector=query_embedding,
+            query_filter=query_filter,
             limit=search_limit
         )
         

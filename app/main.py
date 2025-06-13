@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import session_router, query_router, chat_router
+from app.routers import session_router, query_router, chat_router, collection_router, user_router # Added collection_router, user_router
 from app.database import create_db_and_tables
 from app.config import settings
 import os
@@ -32,6 +32,8 @@ app.add_middleware(
 app.include_router(session_router.router)
 app.include_router(query_router.router)
 app.include_router(chat_router.router)
+app.include_router(collection_router.router) # Added collection_router
+app.include_router(user_router.router) # Added user_router
 
 @app.on_event("startup")
 async def startup_event():
